@@ -23,10 +23,13 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/utils": "^4.0.0",
+    "@vicons/ionicons5": "^0.13.0",
     "electron-updater": "^6.3.9",
     "ethers": "^6.13.5",
     "moment": "^2.30.1",
+    "pina": "^0.20.2204228",
     "ping": "^0.4.4",
+    "pinia": "^3.0.1",
     "puppeteer": "^24.3.0",
     "puppeteer-core": "^24.3.0",
     "puppeteer-extra": "^3.3.6",
