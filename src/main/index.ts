@@ -1,11 +1,12 @@
 import { app, shell, BrowserWindow } from 'electron'
+// import * as logger from 'electron-log/main'
 import { join, resolve } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import moment from 'moment'
 import { registerListeners } from './actions'
-import { initConfig, updateConfig } from './utils/config'
 
+// logger.initialize({ preload: true })
 function createWindow(): BrowserWindow {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -15,7 +16,8 @@ function createWindow(): BrowserWindow {
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      preload: join(__dirname, '../preload/index.mjs'),
       sandbox: false
     }
   })
@@ -29,8 +31,6 @@ function createWindow(): BrowserWindow {
     return { action: 'deny' }
   })
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -41,7 +41,9 @@ function createWindow(): BrowserWindow {
 
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('monad', process.execPath, [resolve(process.argv[1])])
+    app.setAsDefaultProtocolClient('monad', process.execPath, [
+      resolve(process.argv[1])
+    ])
   }
 } else {
   app.setAsDefaultProtocolClient('monad')
@@ -52,7 +54,6 @@ app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
-  initConfig()
   registerListeners()
   const mainWindow = createWindow()
   const lock = app.requestSingleInstanceLock()
@@ -76,13 +77,11 @@ app.whenReady().then(() => {
     app.on('open-url', (event, url) => {
       event.preventDefault()
       const params = new URLSearchParams(url.split('?')[1])
-      const address = params.get('address') as string
       const timestamp = params.get('timestamp')
       const callback = params.get('callback')
       if (moment(timestamp).isBefore(moment().subtract(2, 'minutes'))) {
         return
       } else {
-        updateConfig({ address })
         if (mainWindow) {
           mainWindow.webContents.send('browser-return', callback)
         }

@@ -18,26 +18,29 @@ import {
   NDialogProvider,
   darkTheme,
   NConfigProvider,
-  NSpin
+  NSpin,
 } from 'naive-ui'
 import { useAppStore } from './store'
 import { registerListeners } from './utils'
-import Layout from './Layout.vue'
+import Layout from './pages/index.vue'
 const appStore = useAppStore()
 registerListeners()
 
-window.electron.ipcRenderer.on('browser-return', (_event, url: string): void => {
-  try {
-    const urlObj = new URL(url)
-    const params = new URLSearchParams(urlObj.search)
-    const status = params.get('status')
-    const address = params.get('address')
-    if (status === 'success' && address) {
-      appStore.address = address
-      window.electron.ipcRenderer.send('saveAddress', address)
+window.electron.ipcRenderer.on(
+  'browser-return',
+  (_event, url: string): void => {
+    try {
+      const urlObj = new URL(url)
+      const params = new URLSearchParams(urlObj.search)
+      const status = params.get('status')
+      const address = params.get('address')
+      if (status === 'success' && address) {
+        appStore.address = address
+        window.electron.ipcRenderer.send('saveAddress', address)
+      }
+    } catch (error) {
+      console.error('URL 解析错误:', error)
     }
-  } catch (error) {
-    console.error('URL 解析错误:', error)
   }
-})
+)
 </script>

@@ -1,5 +1,5 @@
 <template>
-  <div style="display: flex; justify-content: center; align-items: center; height: 100vh">
+  <div class="flex justify-center items-center h-[100vh]">
     <n-button type="primary" ghost @click="login">登录</n-button>
   </div>
 </template>
@@ -9,7 +9,7 @@ import { useAppStore } from '../store'
 const appStore = useAppStore()
 const login = (): void => {
   if (!appStore.address) {
-    window.electron.ipcRenderer.send('openUrl', {
+    window.electron.ipcRenderer.send('openExternal', {
       url: 'http://localhost:3000?callback=zebot://openApp'
     })
   }

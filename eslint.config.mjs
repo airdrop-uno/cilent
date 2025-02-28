@@ -6,6 +6,7 @@ export default tseslint.config(
   { ignores: ['**/node_modules', '**/dist', '**/out'] },
   tseslint.configs.recommended,
   eslintPluginVue.configs['flat/recommended'],
+  eslintConfigPrettier,
   {
     files: ['**/*.vue'],
     languageOptions: {
@@ -15,13 +16,14 @@ export default tseslint.config(
     }
   },
   {
-    files: ['**/*.{ts,mts,tsx,vue}'],
+    files: ['**/*.{ts,mts,tsx,vue,cjs,js}'],
     rules: {
       'vue/require-default-prop': 'off',
       'vue/multi-word-component-names': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
-      '@typescript-eslint/no-unused-vars': 'warn'
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
     }
-  },
-  eslintConfigPrettier
+  }
 )

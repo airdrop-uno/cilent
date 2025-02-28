@@ -1,21 +1,20 @@
-import { useAppStore } from '@renderer/store'
+import { useAppStore } from '@/store'
+import { getActivePinia } from 'pinia'
 import { useRouter } from 'vue-router'
 
 export const registerListeners = (): void => {
-  const appStore = useAppStore()
   const router = useRouter()
-  window.electron.ipcRenderer.send('initApp')
+  const pinia = getActivePinia()
+  const appStore = useAppStore(pinia)
+  window.electron.ipcRenderer.send('init')
   appStore.globalLoading = true
-  window.electron.ipcRenderer.on('initAppReply', (_event, { status, data }) => {
+  window.electron.ipcRenderer.on('init', (_event, { status, data }) => {
     if (status) {
       for (const key in data) {
         appStore[key] = data[key]
       }
       appStore.globalLoading = false
     }
-  })
-  window.electron.ipcRenderer.on('updateConfig', (_event, { key, value }) => {
-    appStore[key] = value
   })
   window.electron.ipcRenderer.on('message', (_event, { text, type }) => {
     window.$message[type](text)
@@ -25,11 +24,17 @@ export const registerListeners = (): void => {
   })
 }
 
-export const selectFileOrDirectory = (key: string, type: 'File' | 'Directory'): Promise<string> =>
+export const selectFileOrDirectory = (
+  key: string,
+  type: 'File' | 'Directory'
+): Promise<string> =>
   new Promise((resolve) => {
     {
+      const pinia = getActivePinia()
+      const appStore = useAppStore(pinia)
       window.electron.ipcRenderer.send('select', { type, key })
       window.electron.ipcRenderer.on(`select-${key}`, (_event, value) => {
+        appStore[key] = value
         resolve(value)
       })
     }
@@ -37,9 +42,9 @@ export const selectFileOrDirectory = (key: string, type: 'File' | 'Directory'): 
 export const checkConfigStatus = (keys: string[]): Promise<boolean> =>
   new Promise((resolve, reject) => {
     {
-      window.electron.ipcRenderer.send('checkConfig', keys)
+      window.electron.ipcRenderer.send('check', keys)
       window.electron.ipcRenderer.on(
-        `checkConfig-${keys.join('-')}`,
+        `check-${keys.join('-')}`,
         (_event, { status, message }) => {
           if (!status) {
             window.$message.error(message)
@@ -51,13 +56,38 @@ export const checkConfigStatus = (keys: string[]): Promise<boolean> =>
     }
   })
 
-export const pingHost = (host: string): Promise<boolean> =>
+export const pingHost = (options: {
+  host: string
+  proxy?: string
+}): Promise<{ status: boolean; time: number; message?: string }> =>
   new Promise((resolve) => {
-    window.electron.ipcRenderer.send('ping', host)
-    window.electron.ipcRenderer.on('pingReply', (_event, status) => {
-      resolve(status)
-    })
+    window.electron.ipcRenderer.send('ping', options)
+    window.electron.ipcRenderer.on(
+      'ping',
+      (_event, result: { status: boolean; time: number; message?: string }) => {
+        resolve(result)
+      }
+    )
   })
-export const updateConfig = (key: string, value: unknown): void => {
-  window.electron.ipcRenderer.send('ping', { key, value })
+
+export const openExternal = (url: string): void => {
+  window.electron.ipcRenderer.send('openExternal', url)
 }
+
+export const getChainBalance = (
+  provider: string,
+  address: string
+): Promise<number> =>
+  new Promise((resolve) => {
+    window.electron.ipcRenderer.send('getChainBalance', { provider, address })
+    window.electron.ipcRenderer.on(
+      'getChainBalance',
+      (_event, { balance, status, message }) => {
+        if (status) {
+          resolve(balance)
+        } else {
+          window.$message.error(message)
+        }
+      }
+    )
+  })

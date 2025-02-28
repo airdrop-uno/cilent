@@ -5,6 +5,7 @@ export const useAppStore = defineStore('app', () => ({
   userDirectory: '',
   chromeExecutablePath: '',
   recaptchaToken: '',
+  smsActiveApiKey: '',
   address: '',
-  wallets: []
+  accounts: []
 }))

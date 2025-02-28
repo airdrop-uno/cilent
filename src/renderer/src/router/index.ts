@@ -1,21 +1,73 @@
-// import { useAppStore } from '@renderer/store'
 import { createRouter, createWebHashHistory, RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    name: 'monad',
-    component: () => import('@renderer/pages/Monad.vue')
+    name: 'Home',
+    component: () => import('@/pages/home/index.vue')
   },
+  {
+    path: '/account',
+    name: 'Account',
+    component: () => import('@/pages/account/index.vue'),
+  },
+  {
+    path: '/tools',
+    name: 'Tools',
+    component: () => import('@/pages/tools/index.vue')
+  },
+  {
+    path: '/faucet',
+    name: 'Faucet',
+    redirect: '/faucet/monad',
+    component: () => import('@/pages/faucet/index.vue'),
+    children: [
+      {
+        path: 'goerli',
+        name: 'Goerli',
+        component: () => import('@/pages/faucet/Goerli.vue')
+      },
+      {
+        path: 'sepolia',
+        name: 'Sepolia',
+        component: () => import('@/pages/faucet/Sepolia.vue')
+      }
+    ]
+  },
+
   {
     path: '/profile',
     name: 'Profile',
-    component: () => import('@renderer/pages/Profile.vue')
+    component: () => import('@/pages/Profile.vue')
+  },
+  {
+    path: '/airdrop',
+    name: 'Airdrop',
+    component: () => import('@/pages/airdrop/index.vue'),
+    children: [
+      {
+        path: '/airdrop/monad',
+        name: 'Monad',
+        component: () => import('@/pages/airdrop/monad/index.vue')
+      }
+    ]
+  },
+  {
+    path: '/depin',
+    name: 'Depin',
+    component: () => import('@/pages/depin/index.vue'),
+    children: [
+      {
+        path: '/depin/stork',
+        name: 'Stork',
+        component: () => import('@/pages/depin/stork.vue')
+      }
+    ]
   }
   // {
   //   path: '/login',
   //   name: 'login',
-  //   component: () => import('@renderer/pages/Login.vue')
+  //   component: () => import('@/pages/Login.vue')
   // }
 ]
 
@@ -37,7 +89,7 @@ const router = createRouter({
 //         const appStore = useAppStore()
 //         if (status) {
 //           appStore.address = data.address
-//           appStore.wallets = data.wallets
+//           appStore.accounts = data.accounts
 //           resolve()
 //         }
 //       })

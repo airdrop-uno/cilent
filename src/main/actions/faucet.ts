@@ -1,27 +1,25 @@
 import { IpcMainEvent } from 'electron'
 import { join } from 'path'
-import { createWallet } from '../utils/wallet'
-import { mintFaucet } from '../utils/monad'
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
+import dappeteer from '@chainsafe/dappeteer'
 import moment from 'moment'
-import { getConfig } from '../utils/config'
+import { createAccount } from '../utils/common/account'
+import { mintFaucet } from '../utils/faucet/monad'
+import { MetaMask } from '../constants'
+import { electronStore } from '../store'
 
-export enum FaucetAction {
-  MintMonadTestToken = 'mintMonadTestToken'
-}
-export const AppActions: Record<
-  FaucetAction,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const FaucetActions: Record<
+  string,
   (event: IpcMainEvent, ...args: any[]) => Promise<void>
 > = {
-  [FaucetAction.MintMonadTestToken]: async (
+  mintMonadTestToken: async (
     event: IpcMainEvent,
-    { amount }: { amount: number }
+    { amount, headless }: { amount: number; headless: boolean }
   ) => {
     // 创建文件夹
-    const { userDirectory, chromeExecutablePath, recaptchaToken } = getConfig()
-    const now = moment().format('YYYY-MM-DD HH:mm:ss')
-    const folder = join(userDirectory, `monad-${now}`)
+    const userDirectory = electronStore.get('userDirectory') as string
+    const now = moment().format('YYYYMMDDHHmmss')
+    const folder = join(userDirectory, `monad${now}`)
     if (!existsSync(folder)) {
       mkdirSync(folder, { recursive: true })
     }
@@ -30,28 +28,37 @@ export const AppActions: Record<
       mkdirSync(snapshotFolder, { recursive: true })
     }
     // 创建钱包
-    const wallets = createWallet(amount)
+    const accounts = createAccount(amount)
     // 领取代币
-    for (const wallet of wallets) {
-      event.reply('mint-monad-faucet-progress', {
-        wallet,
-        progress: 0
-      })
-      await mintFaucet(wallet, recaptchaToken, chromeExecutablePath, snapshotFolder)
-      event.reply('mint-monad-faucet-progress', {
-        wallet,
-        progress: 100
-      })
+    for (const account of accounts) {
+      await mintFaucet(account, snapshotFolder, event, { headless })
     }
     // 创建钱包文件
-    const walletsFile = join(folder, 'wallets.json')
-    writeFileSync(walletsFile, JSON.stringify(wallets, null, 2))
+    const accountsFile = join(folder, 'accounts.json')
+    writeFileSync(accountsFile, JSON.stringify(accounts, null, 2))
 
     // 返回结果
-    event.reply('mint-monad-faucet-result', {
-      wallets,
+    event.reply('batchFaucetMonadFinished', {
+      accounts,
       folder,
       snapshotFolder
     })
+  },
+  mintMonadFreeNFT: async (
+    _event: IpcMainEvent,
+    { headless, seed }: { headless: boolean; seed: string }
+  ) => {
+    const { browser } = await dappeteer.bootstrap({
+      seed,
+      headless,
+      password: MetaMask.password,
+      puppeteerOptions: {
+        args: ['--no-sandbox', '--disabled-setupid-sandbox']
+      }
+    })
+    const dappPage = await browser.newPage()
+    await dappPage.goto(
+      'https://magiceden.io/mint-terminal/monad-testnet/0x002c8fd766605b609d31cc9764e27289daf033e9'
+    )
   }
 }

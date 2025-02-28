@@ -1,41 +1,71 @@
 <template>
-  <div style="display: flex; justify-content: center">
-    <div style="display: flex; flex-direction: column; width: 50%; margin-top: 200px">
-      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px">
-        <n-input disabled :value="appStore.userDirectory" placeholder="用户数据存储路径" />
+  <n-card class="h-[100%]">
+    <div class="flex flex-col">
+      <div class="flex items-center gap-[8px] mb-[16px]">
+        <n-tooltip trigger="hover">
+          <template #trigger>
+            <n-input
+              class="w-[300px]"
+              disabled
+              :value="appStore.userDirectory"
+              placeholder="用户数据存储路径"
+            />
+          </template>
+          {{ appStore.userDirectory }}
+        </n-tooltip>
         <n-button
           type="primary"
           ghost
-          style="width: 140px"
+          class="w-[140px]"
           @click="selectFileOrDirectory('userDirectory', 'Directory')"
           >选择数据存储路径</n-button
         >
       </div>
-      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px">
-        <n-input disabled :value="appStore.chromeExecutablePath" placeholder="浏览器路径" />
-        <n-button
-          type="primary"
-          ghost
-          style="width: 140px"
-          @click="selectFileOrDirectory('chromeExecutablePath', 'File')"
-          >选择浏览器路径</n-button
-        >
-      </div>
-      <div style="display: flex; align-items: center; gap: 8px">
+      <div class="flex items-center gap-[8px] mb-4">
         <n-input
           v-model:value="appStore.recaptchaToken"
-          placeholder="recaptcha token"
+          class="w-[300px]"
+          placeholder="Recaptcha Token"
           :show-button="false"
-          @blur="updateConfig('recaptchaToken', appStore.recaptchaToken)"
+          @blur="set('recaptchaToken', appStore.recaptchaToken)"
         />
+        <n-tooltip trigger="hover">
+          <template #trigger>
+            <n-button @click="openExternal('https://2captcha.com/zh/enterpage')"
+              >Recaptcha Token</n-button
+            >
+          </template>
+          点击前往注册
+        </n-tooltip>
+      </div>
+      <div class="flex items-center gap-[8px]">
+        <n-input
+          v-model:value="appStore.smsActiveApiKey"
+          class="w-[300px]"
+          placeholder="SMSActive API Key"
+          :show-button="false"
+          @blur="set('smsActiveApiKey', appStore.smsActiveApiKey)"
+        />
+        <n-tooltip trigger="hover">
+          <template #trigger>
+            <n-button @click="openExternal('https://sms-activate.guru/en')"
+              >SMS Active</n-button
+            >
+          </template>
+          点击前往注册
+        </n-tooltip>
+      </div>
+      <div class="mt-[20px]">
+        <n-tag>IP 管理</n-tag>
       </div>
     </div>
-  </div>
+  </n-card>
 </template>
 
 <script lang="ts" setup>
 import { NInput, NButton } from 'naive-ui'
 import { useAppStore } from '../store'
-import { selectFileOrDirectory, updateConfig } from '../utils'
+import { selectFileOrDirectory, openExternal } from '../utils'
 const appStore = useAppStore()
+const set = (key, value: string) => window.api.set(key, value)
 </script>

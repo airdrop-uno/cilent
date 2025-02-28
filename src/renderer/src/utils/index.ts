@@ -3,5 +3,6 @@ export {
   selectFileOrDirectory,
   checkConfigStatus,
   pingHost,
-  updateConfig
+  openExternal
 } from './app'
+export { createAccounts, updateAccount, formateAddress } from './account'
