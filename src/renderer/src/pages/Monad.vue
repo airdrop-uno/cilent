@@ -70,7 +70,7 @@ const startMint = async (): Promise<void> => {
       amount: amount.value
     })
   } catch (error) {
-    message.error('配置错误', error)
+    console.error('配置错误', error)
     router.push('/profile')
   }
 }

@@ -1,13 +1,6 @@
 <template>
   <div style="display: flex; justify-content: center">
-    <div
-      style="
-        display: flex;
-        flex-direction: column;
-        width: 50%;
-        margin-top: 200px;
-      "
-    >
+    <div style="display: flex; flex-direction: column; width: 50%; margin-top: 200px">
       <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px">
         <n-input disabled :value="appStore.userDirectory" placeholder="用户数据存储路径" />
         <n-button
@@ -33,7 +26,7 @@
           v-model:value="appStore.recaptchaToken"
           placeholder="recaptcha token"
           :show-button="false"
-          @on-blur="updateConfig({ recaptchaToken: appStore.recaptchaToken })"
+          @blur="updateConfig('recaptchaToken', appStore.recaptchaToken)"
         />
       </div>
     </div>
@@ -43,6 +36,6 @@
 <script lang="ts" setup>
 import { NInput, NButton } from 'naive-ui'
 import { useAppStore } from '../store'
-import { selectFileOrDirectory } from '../utils'
+import { selectFileOrDirectory, updateConfig } from '../utils'
 const appStore = useAppStore()
 </script>

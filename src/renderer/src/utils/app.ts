@@ -58,3 +58,6 @@ export const pingHost = (host: string): Promise<boolean> =>
       resolve(status)
     })
   })
+export const updateConfig = (key: string, value: unknown): void => {
+  window.electron.ipcRenderer.send('ping', { key, value })
+}

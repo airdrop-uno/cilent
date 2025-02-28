@@ -1,1 +1,7 @@
-export { registerListeners, selectFileOrDirectory, checkConfigStatus, pingHost } from './app'
+export {
+  registerListeners,
+  selectFileOrDirectory,
+  checkConfigStatus,
+  pingHost,
+  updateConfig
+} from './app'

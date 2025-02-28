@@ -7,7 +7,8 @@ export enum AppAction {
   Select = 'select',
   CheckConfig = 'checkConfig',
   Ping = 'ping',
-  OpenDirectory = 'openDirectory'
+  OpenDirectory = 'openDirectory',
+  UpdateConfig = 'updateConfig'
 }
 export enum AppActionReply {
   OpenUrl = 'openUrlReply',
@@ -62,6 +63,9 @@ export const AppActions: Record<AppAction, (event: IpcMainEvent, ...args: any[])
     },
     [AppAction.OpenDirectory]: async (_event: IpcMainEvent, { path }) => {
       shell.openPath(path)
+    },
+    [AppAction.UpdateConfig]: async (_event: IpcMainEvent, { key, value }) => {
+      updateConfig({ [key]: value })
     }
   }
 
