@@ -1,22 +1,26 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
-import { join } from 'path'
+import { app, shell, BrowserWindow } from 'electron'
+// import * as logger from 'electron-log/main'
+import { join, resolve } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import ping from 'ping'
 import icon from '../../resources/icon.png?asset'
-import { createWallet } from './wallet'
-import { mintFaucet } from './utils/monad'
-import { existsSync, mkdirSync, writeFileSync } from 'fs'
+import moment from 'moment'
+import { registerListeners } from './actions'
+import { checkUpdate } from './utils/system'
 
-function createWindow(): void {
+// logger.initialize({ preload: true })
+function createWindow(): BrowserWindow {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    minHeight: 960,
+    minWidth: 1080,
+    width: 1080,
+    height: 960,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      preload: join(__dirname, '../preload/index.mjs'),
       sandbox: false
     }
   })
@@ -30,92 +34,64 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+  return mainWindow
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('monad', process.execPath, [
+      resolve(process.argv[1])
+    ])
+  }
+} else {
+  app.setAsDefaultProtocolClient('monad')
+}
 app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
-
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
+  checkUpdate()
+  registerListeners()
+  const mainWindow = createWindow()
+  const lock = app.requestSingleInstanceLock()
+  if (!lock) {
+    app.quit()
+  } else {
+    app.on('second-instance', (_event, commandLine) => {
+      console.log('second-instance', commandLine)
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore()
+        mainWindow.focus()
 
-  // IPC test
-  ipcMain.on('ping', async (_event, url) => {
-    console.log('ping', url)
-    const { inputHost } = await ping.promise.probe(url)
-    _event.reply('ping-result', inputHost && inputHost !== 'unknown')
-  })
-  ipcMain.on(
-    'mint-monad-faucet',
-    async (_event, { amount, recaptchaToken, executablePath, selectFolder }) => {
-      console.log(amount, recaptchaToken, selectFolder)
-      // 创建文件夹
-      const now = Date.now()
-      const folder = join(selectFolder, `monad-${now}`)
-      if (!existsSync(folder)) {
-        mkdirSync(folder, { recursive: true })
+        // 获取协议 URL
+        const url = commandLine.find((arg) => arg.startsWith('airdrop.uno://'))
+        console.log('commandLine', commandLine)
+        if (url) {
+          mainWindow.webContents.send('browser-return', url)
+        }
       }
-      const snapshotFolder = join(folder, `snapshot-${now}`)
-      if (!existsSync(snapshotFolder)) {
-        mkdirSync(snapshotFolder, { recursive: true })
+    })
+    app.on('open-url', (event, url) => {
+      event.preventDefault()
+      const params = new URLSearchParams(url.split('?')[1])
+      const timestamp = params.get('timestamp')
+      const callback = params.get('callback')
+      if (moment(timestamp).isBefore(moment().subtract(2, 'minutes'))) {
+        return
+      } else {
+        if (mainWindow) {
+          mainWindow.webContents.send('browser-return', callback)
+        }
       }
-      // 创建钱包
-      const wallets = createWallet(amount)
-      // 领取代币
-      for (const wallet of wallets) {
-        console.log('mint', wallet)
-        _event.reply('mint-monad-faucet-progress', {
-          wallet,
-          progress: 0
-        })
-        await mintFaucet(wallet, recaptchaToken, executablePath, snapshotFolder)
-        _event.reply('mint-monad-faucet-progress', {
-          wallet,
-          progress: 100
-        })
-      }
-
-      // 创建钱包文件
-      const walletsFile = join(folder, 'wallets.json')
-      writeFileSync(walletsFile, JSON.stringify(wallets, null, 2))
-
-      // 返回结果
-      _event.reply('mint-monad-faucet-result', {
-        wallets,
-        folder,
-        snapshotFolder
-      })
-    }
-  )
-  ipcMain.on('select-path', (_event) => {
-    dialog
-      .showOpenDialog({
-        properties: ['openDirectory']
-      })
-      .then((result) => {
-        console.log(result)
-        _event.reply('select-path-result', result)
-      })
-  })
-  ipcMain.on('open-folder', (_event, folder) => {
-    shell.openPath(folder)
-  })
-
-  createWindow()
+    })
+  }
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the

@@ -1,6 +1,4 @@
-# zebot
-
-An Electron application with Vue and TypeScript
+# airdrop.uno
 
 ## Recommended IDE Setup
 
@@ -8,27 +6,6 @@ An Electron application with Vue and TypeScript
 
 ## Project Setup
 
-### Install
-
-```bash
-$ pnpm install
-```
-
-### Development
-
-```bash
-$ pnpm dev
-```
-
-### Build
-
-```bash
-# For windows
-$ pnpm build:win
-
-# For macOS
-$ pnpm build:mac
-
-# For Linux
-$ pnpm build:linux
+```shell
+"postinstall": "electron-builder install-app-deps"
 ```

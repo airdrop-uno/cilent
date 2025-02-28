@@ -1,0 +1,72 @@
+name: Build/release airdrop.uno client
+
+on:
+  push:
+    tags:
+      - v*.*.*
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v3
+        with:
+          ref: main  # 确保使用更新后的 main 分支
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools
+
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install Dependencies
+        run: |
+          bun install
+
+      - name: build-mac
+        if: matrix.os == 'macos-latest'
+        run: bun run build:mac
+
+      - name: build-win
+        if: matrix.os == 'windows-latest'
+        run: bun run build:win
+
+      - name: Upload to Supabase Storage
+        env:
+          SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+          SUPABASE_ANOE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          # 安装 Supabase CLI
+          # bun install @supabase/supabase-js
+
+          # 运行上传脚本
+          # bun upload.mjs
+
+      - name: release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          files: |
+            dist/*.exe
+            dist/*.zip
+            dist/*.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
