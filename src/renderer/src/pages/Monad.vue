@@ -32,8 +32,10 @@
       </n-input>
       <n-button type="primary" ghost style="width: 140px" @click="startMint"> 开始领水 </n-button>
     </div>
-    <div v-for="log in mintLogs" :key="log.wallet">
-      {{ log.message }}
+    <div style="margin-top: 16px; max-height: 300px; overflow-y: auto">
+      <div v-for="log in mintLogs" :key="log.wallet">
+        {{ log.message }}
+      </div>
     </div>
   </n-spin>
 </template>
@@ -42,9 +44,9 @@
 import { h, ref } from 'vue'
 import { NInputNumber, NInput, NButton, useMessage, useNotification, NTag, NSpin } from 'naive-ui'
 // '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-const amount = ref()
+const amount = ref(5)
 const recaptchaToken = ref('e4359912f575054d499739864178a8cb')
-const selectFolder = ref()
+const selectFolder = ref('/Users/terry/Desktop/code/monad')
 const executablePath = ref('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
 const message = useMessage()
 const notification = useNotification()

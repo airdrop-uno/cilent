@@ -1,13 +1,16 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import ping from 'ping'
 import icon from '../../resources/icon.png?asset'
 import { createWallet } from './wallet'
 import { mintFaucet } from './utils/monad'
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
+import moment from 'moment'
+import { registerListeners } from './actions'
+import { updateConfig } from './utils/config'
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 900,
@@ -37,18 +40,19 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+  return mainWindow
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('monad', process.execPath, [resolve(process.argv[1])])
+  }
+} else {
+  app.setAsDefaultProtocolClient('monad')
+}
 app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
-
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
@@ -64,7 +68,7 @@ app.whenReady().then(() => {
     async (_event, { amount, recaptchaToken, executablePath, selectFolder }) => {
       console.log(amount, recaptchaToken, selectFolder)
       // 创建文件夹
-      const now = Date.now()
+      const now = moment().format('YYYY-MM-DD HH:mm:ss')
       const folder = join(selectFolder, `monad-${now}`)
       if (!existsSync(folder)) {
         mkdirSync(folder, { recursive: true })
@@ -114,8 +118,42 @@ app.whenReady().then(() => {
   ipcMain.on('open-folder', (_event, folder) => {
     shell.openPath(folder)
   })
+  registerListeners()
+  const mainWindow = createWindow()
+  const lock = app.requestSingleInstanceLock()
+  if (!lock) {
+    app.quit()
+  } else {
+    app.on('second-instance', (_event, commandLine) => {
+      console.log('second-instance', commandLine)
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore()
+        mainWindow.focus()
 
-  createWindow()
+        // 获取协议 URL
+        const url = commandLine.find((arg) => arg.startsWith('zebot://'))
+        console.log('commandLine', commandLine)
+        if (url) {
+          mainWindow.webContents.send('browser-return', url)
+        }
+      }
+    })
+    app.on('open-url', (event, url) => {
+      event.preventDefault()
+      const params = new URLSearchParams(url.split('?')[1])
+      const address = params.get('address')
+      const timestamp = params.get('timestamp')
+      const callback = params.get('callback')
+      if (moment(timestamp).isBefore(moment().subtract(2, 'minutes'))) {
+        return
+      } else {
+        updateConfig({ address })
+        if (mainWindow) {
+          mainWindow.webContents.send('browser-return', callback)
+        }
+      }
+    })
+  }
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
