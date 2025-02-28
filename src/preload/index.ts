@@ -1,8 +1,17 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-
+import { Store } from '../main/store'
+import { NestKey, NestValue } from './index.d'
 // Custom APIs for renderer
-const api = {}
+const api = {
+  set: <Key extends NestKey<Store>>(key: Key, value: NestValue<Store, Key>) => {
+    return ipcRenderer.send('set', key, value)
+  },
+
+  get: <Key extends NestKey<Store>>(key: Key): NestValue<Store, Key> => {
+    return ipcRenderer.sendSync('get', key)
+  }
+}
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise

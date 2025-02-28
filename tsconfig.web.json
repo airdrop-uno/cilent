@@ -4,15 +4,19 @@
     "src/renderer/src/env.d.ts",
     "src/renderer/src/**/*",
     "src/renderer/src/**/*.vue",
-    "src/preload/*.d.ts"
-  ],
+    "src/preload/*.d.ts",
+    "src/types/**/*"
+, "src/renderer/src/utils"  ],
   "compilerOptions": {
     "composite": true,
     "baseUrl": ".",
     "paths": {
       "@renderer/*": [
         "src/renderer/src/*"
-      ]
+      ],
+      "@/*": [
+        "src/renderer/src/*"
+      ],
     },
     "types": ["vite/client", "naive-ui/volar"]
   }
