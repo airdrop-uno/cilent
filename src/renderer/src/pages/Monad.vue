@@ -1,40 +1,40 @@
 <template>
   <n-spin :show="spinning" description="正在领取测试代币">
-    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px">
-      <n-tag v-if="networkStatus" type="success">网络畅通</n-tag>
-      <n-tag v-else type="error">网络不通</n-tag>
-      <n-input disabled value="testnet.monad.xyz" />
-      <n-button
-        type="primary"
-        :loading="loading"
-        ghost
-        style="width: 140px"
-        @click="checkNetworkStatus"
-        >检测网络状态</n-button
+    <div style="display: flex; justify-content: center">
+      <div
+        style="
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          width: 50%;
+          margin-top: 200px;
+        "
       >
-    </div>
-    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px">
-      <n-input disabled :value="selectFolder" placeholder="数据存储路径" />
-      <n-button type="primary" ghost style="width: 140px" @click="selectPath"
-        >选择数据存储路径</n-button
-      >
-    </div>
-    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px">
-      <n-input disabled :value="executablePath" placeholder="浏览器路径" />
-      <n-button type="primary" ghost style="width: 140px" @click="selectPath"
-        >选择浏览器路径</n-button
-      >
-    </div>
-    <div style="display: flex; align-items: center; gap: 8px">
-      <n-input-number v-model:value="amount" placeholder="钱包数量" :show-button="false" />
-      <n-input v-model:value="recaptchaToken" placeholder="recaptcha token" :show-button="false">
-        <template #suffix> </template>
-      </n-input>
-      <n-button type="primary" ghost style="width: 140px" @click="startMint"> 开始领水 </n-button>
-    </div>
-    <div style="margin-top: 16px; max-height: 300px; overflow-y: auto">
-      <div v-for="log in mintLogs" :key="log.wallet">
-        {{ log.message }}
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px">
+          <n-tag :type="networkStatus ? 'success' : 'error'">{{
+            networkStatus ? '网络正常' : '网络不通'
+          }}</n-tag>
+          <n-input disabled value="testnet.monad.xyz" />
+          <n-button
+            type="primary"
+            :loading="loading"
+            ghost
+            style="width: 140px"
+            @click="checkNetworkStatus"
+            >检测网络状态</n-button
+          >
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px">
+          <n-input-number v-model:value="amount" placeholder="钱包数量" :show-button="false" />
+          <n-button type="primary" ghost style="width: 140px" @click="startMint">
+            开始领水
+          </n-button>
+        </div>
+        <div style="margin-top: 16px; max-height: 300px; overflow-y: auto">
+          <div v-for="log in mintLogs" :key="log.wallet">
+            {{ log.message }}
+          </div>
+        </div>
       </div>
     </div>
   </n-spin>
@@ -42,54 +42,37 @@
 
 <script setup lang="ts">
 import { h, ref } from 'vue'
-import { NInputNumber, NInput, NButton, useMessage, useNotification, NTag, NSpin } from 'naive-ui'
-// '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+import { useRouter } from 'vue-router'
+import { useMessage, useNotification, NButton } from 'naive-ui'
+import { checkConfigStatus, pingHost } from '../utils'
 const amount = ref(5)
-const recaptchaToken = ref('e4359912f575054d499739864178a8cb')
-const selectFolder = ref('/Users/terry/Desktop/code/monad')
-const executablePath = ref('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
 const message = useMessage()
+const router = useRouter()
 const notification = useNotification()
 const spinning = ref(false)
 const networkStatus = ref(false)
 const loading = ref(false)
-const checkNetworkStatus = (): void => {
+const checkNetworkStatus = async (): Promise<void> => {
   loading.value = true
-  window.electron.ipcRenderer.send('ping', 'testnet.monad.xyz')
-}
-window.electron.ipcRenderer.on('ping-result', (_event, result) => {
-  networkStatus.value = result
+  networkStatus.value = await pingHost('testnet.monad.xyz')
   loading.value = false
-})
+}
 
-const startMint = (): void => {
+const startMint = async (): Promise<void> => {
   if (!amount.value) {
     message.error('请输入钱包数量')
     return
   }
-  if (!recaptchaToken.value) {
-    message.error('请输入recaptcha token')
-    return
+  try {
+    await checkConfigStatus(['userDirectory', 'chromeExecutablePath', 'recaptchaToken'])
+    spinning.value = true
+    window.electron.ipcRenderer.send('mint-monad-faucet', {
+      amount: amount.value
+    })
+  } catch (error) {
+    message.error('配置错误', error)
+    router.push('/profile')
   }
-  if (!selectFolder.value) {
-    message.error('请选择数据存储路径')
-    return
-  }
-  if (!executablePath.value) {
-    message.error('请选择浏览器路径')
-    return
-  }
-  spinning.value = true
-  window.electron.ipcRenderer.send('mint-monad-faucet', {
-    amount: amount.value,
-    recaptchaToken: recaptchaToken.value,
-    selectFolder: selectFolder.value,
-    executablePath: executablePath.value
-  })
-}
-
-const selectPath = (): void => {
-  window.electron.ipcRenderer.send('select-path')
 }
 
 window.electron.ipcRenderer.on('mint-monad-faucet-result', (_event, { wallets, folder }) => {
@@ -104,16 +87,12 @@ window.electron.ipcRenderer.on('mint-monad-faucet-result', (_event, { wallets, f
           text: true,
           type: 'primary',
           onClick: () => {
-            window.electron.ipcRenderer.send('open-folder', folder)
+            window.electron.ipcRenderer.send('openDirectory', folder)
           }
         },
         { default: () => '打开文件夹' }
       )
   })
-})
-
-window.electron.ipcRenderer.on('select-path-result', (_event, result) => {
-  selectFolder.value = result.filePaths[0]
 })
 const mintLogs = ref<{ wallet: string; message: string }[]>([])
 window.electron.ipcRenderer.on('mint-monad-faucet-progress', (_event, { wallet, progress }) => {

@@ -7,6 +7,11 @@ const routes: RouteRecordRaw[] = [
     name: 'monad',
     component: () => import('@renderer/pages/Monad.vue')
   },
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: () => import('@renderer/pages/Profile.vue')
+  }
   // {
   //   path: '/login',
   //   name: 'login',

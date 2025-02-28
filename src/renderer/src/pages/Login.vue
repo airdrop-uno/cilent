@@ -5,7 +5,6 @@
 </template>
 
 <script setup lang="ts">
-import { NButton } from 'naive-ui'
 import { useAppStore } from '../store'
 const appStore = useAppStore()
 const login = (): void => {

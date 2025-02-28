@@ -11,6 +11,9 @@ dependencies:
   '@electron-toolkit/utils':
     specifier: ^4.0.0
     version: 4.0.0(electron@34.3.0)
+  '@vicons/ionicons5':
+    specifier: ^0.13.0
+    version: 0.13.0
   electron-updater:
     specifier: ^6.3.9
     version: 6.3.9
@@ -1538,6 +1541,13 @@ packages:
       eslint-visitor-keys: 4.2.0
     dev: true
 
+<<<<<<< HEAD
+=======
+  /@vicons/ionicons5@0.13.0:
+    resolution: {integrity: sha512-zvZKBPjEXKN7AXNo2Na2uy+nvuv6SP4KAMQxpKL2vfHMj0fSvuw7JZcOPCjQC3e7ayssKnaoFVAhbYcW6v41qQ==}
+    dev: false
+
+>>>>>>> 9b88aca (feat: 添加profile，统一管理配置)
   /@vitejs/plugin-vue@5.2.1(vite@6.2.0)(vue@3.5.13):
     resolution: {integrity: sha512-cxh314tzaWwOLqVes2gnnCtvBDcM1UMdn+iFR+UjAn411dPT3tOmqrJjbMd7koZpMAmBM/GqeV4n9ge7JSiJJQ==}
     engines: {node: ^18.0.0 || >=20.0.0}

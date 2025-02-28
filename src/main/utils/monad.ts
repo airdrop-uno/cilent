@@ -1,12 +1,13 @@
 import puppeteer from 'puppeteer-extra'
 import RecaptchaPlugin from 'puppeteer-extra-plugin-recaptcha'
-import { Wallet } from '../wallet'
+import { Wallet } from './wallet'
 
 export const mintFaucet = (
   wallet: Wallet,
   recaptchaToken: string,
   executablePath: string,
-  snapshotFolder: string
+  snapshotFolder: string,
+  proxy?: { host: string; port: number }
 ): Promise<boolean> =>
   new Promise((resolve, reject) => {
     process.env.DEBUG = 'puppeteer-extra,puppeteer-extra-plugin:*'
@@ -19,11 +20,15 @@ export const mintFaucet = (
         visualFeedback: true
       })
     )
+    const args = ['--disable-web-security', '--allow-running-insecure-content']
+    if (proxy) {
+      args.push(`--proxy-server=${proxy.host}:${proxy.port}`)
+    }
     puppeteer
       .launch({
         headless: true,
         executablePath,
-        args: ['--disable-web-security', '--allow-running-insecure-content']
+        args
       })
       .then(async (browser) => {
         try {
