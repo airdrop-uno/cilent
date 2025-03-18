@@ -11,6 +11,7 @@ import { electronStore } from '../../store'
 import { Account } from '../../../types/account'
 import { getProxyAgent } from '../../utils/depin'
 import { storkWorkerScript } from '../../workers/stork'
+import { sleep } from '../../utils/common'
 
 export const StorkBaseURL = 'https://app-api.jp.stork-oracle.network/v1'
 export const request = new Request(StorkBaseURL)
@@ -48,12 +49,11 @@ export class Stork {
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36'
   }
   private cognitoUserPool: CognitoUserPool = userPool
-  private intervalSeconds: number = 10 * 1000
+  private intervalSeconds: number = 30 * 1000
   public status: ExecuteStatus = ExecuteStatus.PENDING
   private event!: IpcMainEvent
   public availableWorkers: number = os.cpus().length / 2
   private queue!: PQueue
-  private executeMap: Record<string, number> = {}
   constructor(event: IpcMainEvent) {
     this.event = event
     this.queue = new PQueue({ concurrency: Math.min(os.cpus().length, 5) })
@@ -69,14 +69,6 @@ export class Stork {
   }
   public setIntervalSeconds(intervalSeconds: number) {
     this.intervalSeconds = intervalSeconds
-  }
-  public async checkPassword(
-    email: string,
-    password: string
-  ): Promise<boolean> {
-    const tokenManager = new TokenManager(email, password, this.cognitoUserPool)
-    await tokenManager.getValidToken()
-    return tokenManager.token?.isAuthenticated || false
   }
   public static getHeaders(
     token: string,
@@ -106,10 +98,9 @@ export class Stork {
     return data as T
   }
   private async getSignedPrices(
-    tokenManager: TokenManager,
+    token: string,
     options: Partial<Account>
   ): Promise<SignedPrice[]> {
-    const token = tokenManager.token?.accessToken
     if (!token) return []
     const signedPricesData = await this.getData<SignedPricesData>(
       '/stork_signed_prices',
@@ -152,60 +143,45 @@ export class Stork {
       )
     })
   }
-  async startVerify(tokenManager: TokenManager, options: Partial<Account>) {
+  async startVerify(token: string, options: Partial<Account>) {
     if (this.status !== ExecuteStatus.RUNNING) return
-    try {
-      const token = tokenManager.token?.accessToken
-      if (!token) return
-      const { proxy } = options
-      const userData = await this.getData<UserData>('/me', token, options)
-      if (!userData || !userData.stats)
-        throw new Error('无法获取初始用户统计信息')
-      const signedPrices = await this.getSignedPrices(tokenManager, options)
-      if (!signedPrices || !signedPrices.length)
-        throw new Error('没有数据需要验证')
-      const workers: any[] = []
-      const chunkSize = Math.ceil(signedPrices.length / this.availableWorkers)
-      const batches: Array<typeof signedPrices> = []
-      for (let i = 0; i < signedPrices.length; i += chunkSize) {
-        batches.push(signedPrices.slice(i, i + chunkSize))
-      }
-      for (
-        let i = 0;
-        i < Math.min(batches.length, this.availableWorkers);
-        i++
-      ) {
-        const batch = batches[i]
-        for (const priceData of batch) {
-          workers.push(this.createWorker(priceData, token, proxy))
-        }
-      }
-      const results = await Promise.all(workers)
-      const currentTimeValid = results.filter((r) => r.success).length
-      const updatedUserData = await this.getData<UserData>(
-        '/me',
-        token,
-        options
-      )
-      const totalValid =
-        updatedUserData.stats.stork_signed_prices_valid_count || 0
-      const totalInvalid =
-        updatedUserData.stats.stork_signed_prices_invalid_count || 0
-      this.logger(
-        'info',
-        `${options.email} 执行完成，验证数量:${signedPrices.length}，成功数量:${currentTimeValid}，失败数量:${totalInvalid}，有效数量:${totalValid}`
-      )
-      const accounts = electronStore.get('storkAccounts')
-      const index = accounts.findIndex(
-        (account) => account.email === options.email
-      )
-      accounts[index].validCount = totalValid
-      electronStore.set('storkAccounts', accounts)
-      this.event.reply('updateAccounts', accounts)
-    } catch (error) {
-      console.error(error)
-      throw error
+    const { proxy } = options
+    const userData = await this.getData<UserData>('/me', token, options)
+    if (!userData || !userData.stats)
+      throw new Error('无法获取初始用户统计信息')
+    const signedPrices = await this.getSignedPrices(token, options)
+    if (!signedPrices || !signedPrices.length)
+      throw new Error('没有数据需要验证')
+    const workers: any[] = []
+    const chunkSize = Math.ceil(signedPrices.length / this.availableWorkers)
+    const batches: Array<typeof signedPrices> = []
+    for (let i = 0; i < signedPrices.length; i += chunkSize) {
+      batches.push(signedPrices.slice(i, i + chunkSize))
     }
+    for (let i = 0; i < Math.min(batches.length, this.availableWorkers); i++) {
+      const batch = batches[i]
+      for (const priceData of batch) {
+        workers.push(this.createWorker(priceData, token, proxy))
+      }
+    }
+    const results = await Promise.all(workers)
+    const currentTimeValid = results.filter((r) => r.success).length
+    const updatedUserData = await this.getData<UserData>('/me', token, options)
+    const totalValid =
+      updatedUserData.stats.stork_signed_prices_valid_count || 0
+    const totalInvalid =
+      updatedUserData.stats.stork_signed_prices_invalid_count || 0
+    this.logger(
+      'info',
+      `${options.email} 执行完成，验证数量:${signedPrices.length}，成功数量:${currentTimeValid}，失败数量:${totalInvalid}，有效数量:${totalValid}`
+    )
+    const accounts = electronStore.get('storkAccounts')
+    const index = accounts.findIndex(
+      (account) => account.email === options.email
+    )
+    accounts[index].validCount = totalValid
+    electronStore.set('storkAccounts', accounts)
+    this.event.reply('updateAccounts', accounts)
   }
 
   async run() {
@@ -214,19 +190,42 @@ export class Stork {
       if (this.status !== ExecuteStatus.RUNNING) return
       const storkAccounts = electronStore.get('storkAccounts')
       for (const account of storkAccounts) {
-        const { email, password } = account
-        const lastTime = this.executeMap[email]
-        if (!lastTime || Date.now() - lastTime >= this.intervalSeconds) {
-          this.queue.add(async () => {
-            const tokenManager = new TokenManager(
-              email,
-              password,
-              this.cognitoUserPool
-            )
-            await tokenManager.getValidToken()
-            await this.startVerify(tokenManager, account)
-          })
-        }
+        const { email, password, proxy, token, expiresAt } = account
+        this.queue.add(async () => {
+          try {
+            if (token && expiresAt && Date.now() < expiresAt) {
+              this.logger('info', `${email} token有效，使用缓存`)
+              await this.startVerify(token, account)
+            } else {
+              this.logger('info', `${email} token无效，更新token中`)
+              await sleep(1)
+              const tokenManager = new TokenManager(
+                email,
+                password,
+                this.cognitoUserPool,
+                proxy
+              )
+              await tokenManager.getValidToken()
+              // 更新账户信息token
+              account.token = tokenManager.token?.accessToken
+              account.expiresAt = tokenManager.expiresAt
+              electronStore.set('storkAccounts', storkAccounts)
+              this.logger('info', `${email} token更新完成，开始验证`)
+              await this.startVerify(
+                tokenManager.token?.accessToken as string,
+                account
+              )
+            }
+          } catch (error) {
+            const message = (error as any).message
+            if (message.toLowerCase().includes('password')) {
+              this.logger('error', `验证${email}失败:${message}:${password}`)
+            } else {
+              this.logger('error', `验证${email}失败:${message}`)
+            }
+            console.error(error)
+          }
+        })
       }
     }, this.intervalSeconds)
   }

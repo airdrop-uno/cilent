@@ -10,22 +10,29 @@ export class TokenManager {
   public idToken: string | null
   public expiresAt: number
   public auth: CognitoAuth
+  public proxy?: string
   public token:
     | (Omit<CognitoAuthResult, 'expiresIn'> & {
         isAuthenticated: boolean
         isVerifying: boolean
       })
     | null
-  constructor(username: string, password: string, userPool: CognitoUserPool) {
+  constructor(
+    username: string,
+    password: string,
+    userPool: CognitoUserPool,
+    proxy?: string
+  ) {
     this.username = username
     this.password = password
     this.userPool = userPool
+    this.proxy = proxy
     this.accessToken = null
     this.refreshToken = null
     this.idToken = null
     this.token = null
     this.expiresAt = Date.now()
-    this.auth = new CognitoAuth(username, password, this.userPool)
+    this.auth = new CognitoAuth(username, password, this.userPool, this.proxy)
   }
 
   async getValidToken() {

@@ -19,6 +19,8 @@ export interface Account extends Email, Wallet {
 
 export interface StorkAccount extends Email {
   proxy?: string
+  token?: string
+  expiresAt?: number
   validCount?: number
 }
 export interface HumanityAccount extends Wallet {
