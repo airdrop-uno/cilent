@@ -194,7 +194,7 @@ export class Stork {
         this.queue.add(async () => {
           try {
             if (token && expiresAt && Date.now() < expiresAt) {
-              this.logger('info', `${email} token有效，使用缓存`)
+              this.logger('info', `${email} token有效，使用缓存开始验证`)
               await this.startVerify(token, account)
             } else {
               this.logger('info', `${email} token无效，更新token中`)

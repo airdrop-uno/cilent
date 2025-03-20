@@ -1,5 +1,5 @@
 <template>
-  <n-space vertical>
+  <n-space vertical class="overflow-hidden">
     <n-layout has-sider style="background-color: null">
       <n-layout-sider
         bordered

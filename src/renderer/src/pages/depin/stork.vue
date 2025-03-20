@@ -6,7 +6,13 @@
           <n-button type="primary" @click="startStork">启动</n-button>
           <n-button type="primary" @click="addAccount">添加账号</n-button>
         </n-space>
-        <n-data-table :columns="columns" :data="accounts" striped bordered />
+        <n-data-table
+          :columns="columns"
+          :data="accounts"
+          striped
+          bordered
+          :max-height="450"
+        />
       </n-tab-pane>
 
       <n-tab-pane name="logs" tab="日志">
@@ -21,10 +27,25 @@
     </n-tabs>
     <n-drawer v-model:show="addDrawerVisible" :width="650">
       <n-drawer-content title="添加账号">
-        <n-button @click="addAccounts.push(defaultAccount)">继续添加</n-button>
+        <n-button @click="addAccounts.push(defaultAccount())"
+          >继续添加</n-button
+        >
         <div class="flex flex-col gap-2 mt-2">
-          <n-input-group v-for="account in addAccounts" :key="account.email">
-            <n-input v-model:value="account.email" placeholder="邮箱" />
+          <n-input-group v-for="(account, index) in addAccounts" :key="index">
+            <n-auto-complete
+              v-model:value="account.email"
+              placeholder="邮箱"
+              clearable
+              :options="
+                ['@gmail.com', '@163.com', '@qq.com'].map((suffix) => {
+                  const prefix = account.email.split('@')[0]
+                  return {
+                    label: prefix + suffix,
+                    value: prefix + suffix
+                  }
+                })
+              "
+            />
             <n-input v-model:value="account.password" placeholder="密码" />
             <n-input v-model:value="account.proxy" placeholder="代理" />
           </n-input-group>
@@ -41,7 +62,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, h, toRaw } from 'vue'
+import { ref, onMounted, h, toRaw, computed } from 'vue'
 import {
   useMessage,
   DataTableColumns,
@@ -56,11 +77,11 @@ interface RowData {
   password: string
   proxy: string
 }
-const defaultAccount: StorkAccount = {
+const defaultAccount: () => StorkAccount = () => ({
   email: '',
   password: '',
   proxy: ''
-}
+})
 const message = useMessage()
 const dialog = useDialog()
 const logs = ref<string[]>([])
@@ -69,23 +90,30 @@ const addAccounts = ref<StorkAccount[]>([])
 const columns: DataTableColumns<RowData> = [
   {
     title: '邮箱',
-    key: 'email'
+    key: 'email',
+    fixed: 'left',
+    width: 250
   },
   {
     title: '密码',
-    key: 'password'
+    key: 'password',
+    width: 250
   },
   {
     title: '代理',
-    key: 'proxy'
+    key: 'proxy',
+    minWidth: 350
   },
   {
     title: '有效数量',
-    key: 'validCount'
+    key: 'validCount',
+    width: 150
   },
   {
     key: 'action',
     title: '操作',
+    fixed: 'right',
+    width: 150,
     render(row) {
       return h(
         'div',
@@ -172,7 +200,7 @@ const startStork = () => {
 }
 const addDrawerVisible = ref(false)
 const addAccount = () => {
-  addAccounts.value = [defaultAccount]
+  addAccounts.value = [defaultAccount()]
   addDrawerVisible.value = true
 }
 const saveAccounts = () => {
