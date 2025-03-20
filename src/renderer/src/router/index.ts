@@ -9,7 +9,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/account',
     name: 'Account',
-    component: () => import('@/pages/account/index.vue'),
+    component: () => import('@/pages/account/index.vue')
   },
   {
     path: '/tools',
@@ -61,6 +61,11 @@ const routes: RouteRecordRaw[] = [
         path: '/depin/stork',
         name: 'Stork',
         component: () => import('@/pages/depin/stork.vue')
+      },
+      {
+        path: '/depin/nodeGo',
+        name: 'NodeGo',
+        component: () => import('@/pages/depin/nodeGo.vue')
       }
     ]
   }

@@ -4,7 +4,9 @@ import {
   Account,
   StorkAccount,
   HumanityAccount,
-  VoltixAccount
+  VoltixAccount,
+  NodeGoAccount,
+  DawnAccount
 } from '../types/account'
 
 export interface Store {
@@ -18,6 +20,8 @@ export interface Store {
   gmailAccounts: any[]
   humanityAccounts: HumanityAccount[]
   voltixAccounts: VoltixAccount[]
+  nodeGoAccounts: NodeGoAccount[]
+  dawnAccounts: DawnAccount[]
 }
 export const electronStore = new ElectronStore<Store>({
   schema: {
@@ -58,6 +62,14 @@ export const electronStore = new ElectronStore<Store>({
       default: []
     },
     voltixAccounts: {
+      type: 'array',
+      default: []
+    },
+    nodeGoAccounts: {
+      type: 'array',
+      default: []
+    },
+    dawnAccounts: {
       type: 'array',
       default: []
     }

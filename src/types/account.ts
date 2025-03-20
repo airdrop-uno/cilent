@@ -34,3 +34,16 @@ export interface VoltixAccount {
   integral: number
   category: 'ONE' | 'DAILY'
 }
+export interface NodeGoAccount {
+  email: string
+  token: string
+  proxy?: string
+  ua: string
+}
+
+export interface DawnAccount {
+  email: string
+  proxy?: string
+  ua: string
+  token: string
+}

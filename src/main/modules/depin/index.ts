@@ -1,12 +1,22 @@
+import { IpcMainEvent } from 'electron'
+import PQueue from 'p-queue'
+import os from 'os'
 export class DePIN {
-  protected email: string
-  protected password: string
-  protected proxy: string
-  protected token: string
-  constructor(email: string, password: string, proxy: string, token: string) {
-    this.email = email
-    this.password = password
-    this.proxy = proxy
-    this.token = token
+  protected event: IpcMainEvent
+  protected queue: PQueue
+  protected intervalSeconds: number = 30 * 1000
+  protected name: string
+  constructor(
+    event: IpcMainEvent,
+    name: string,
+    intervalSeconds: number = 30 * 1000
+  ) {
+    this.event = event
+    this.queue = new PQueue({ concurrency: os.cpus().length })
+    this.intervalSeconds = intervalSeconds
+    this.name = name
+  }
+  logger(message: string) {
+    this.event.reply(`${this.name}Log`, { type: 'info', message })
   }
 }

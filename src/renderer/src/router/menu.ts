@@ -129,6 +129,10 @@ export const menuOptions: MenuOption[] = [
             'Stork Verify'
           ),
         key: 'Stork'
+      },
+      {
+        label: () => h(RouterLink, { to: { path: '/depin/nodeGo' } }, 'NodeGo'),
+        key: 'NodeGo'
       }
     ]
   },
