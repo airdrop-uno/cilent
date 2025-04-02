@@ -4,40 +4,6 @@
       <n-tabs type="line" animated>
         <n-tab-pane name="dashboard" tab="面板">
           <n-space class="mb-2">
-            <n-input
-              v-model:value="runningInfo.referralCode"
-              placeholder=""
-              class="w-[180px]"
-            >
-              <template #prefix>邀请码：</template>
-            </n-input>
-            <n-input-number
-              v-model:value="runningInfo.concurrency"
-              class="w-[160px]"
-            >
-              <template #prefix>并发数：</template>
-            </n-input-number>
-            <n-select
-              v-model:value="runningInfo.proxyMode"
-              placeholder=""
-              class="w-[140px]"
-              :options="[
-                { label: '不使用代理', value: 'None' },
-                { label: '静态代理', value: 'Static' },
-                { label: '动态代理', value: 'Dynamic' }
-              ]"
-            >
-            </n-select>
-
-            <n-input
-              v-if="runningInfo.proxyMode === 'Dynamic'"
-              v-model:value="runningInfo.proxyApiUrl"
-              placeholder=""
-            >
-              <template #prefix>代理API：</template>
-            </n-input>
-          </n-space>
-          <n-space class="mb-[16px] flex items-center gap-2">
             <n-button type="primary" @click="startMonadScore">启动</n-button>
             <n-button type="primary" @click="stopMonadScore">停止</n-button>
             <n-popconfirm
@@ -55,6 +21,50 @@
               />
             </n-popconfirm>
           </n-space>
+          <n-space class="mb-2 flex justify-between items-center gap-2">
+            <div class="flex items-center gap-2">
+              <n-input
+                v-model:value="runningInfo.referralCode"
+                placeholder=""
+                class="w-[180px]"
+              >
+                <template #prefix>邀请码：</template>
+              </n-input>
+              <n-input-number
+                v-model:value="runningInfo.concurrency"
+                class="w-[160px]"
+              >
+                <template #prefix>并发数：</template>
+              </n-input-number>
+              <n-select
+                v-model:value="runningInfo.proxyMode"
+                placeholder=""
+                class="w-[140px]"
+                :options="[
+                  { label: '不使用代理', value: 'None' },
+                  { label: '静态代理', value: 'Static' },
+                  { label: '动态代理', value: 'Dynamic' }
+                ]"
+              >
+              </n-select>
+
+              <n-input
+                v-if="runningInfo.proxyMode === 'Dynamic'"
+                v-model:value="runningInfo.proxyApiUrl"
+                placeholder=""
+              >
+                <template #prefix>代理API：</template>
+              </n-input>
+            </div>
+
+            <div class="text-sm">
+              共{{ accounts.length }}个，已注册{{
+                accounts.filter((account) => account.registered).length
+              }}个，运行中{{
+                accounts.filter((account) => isRunningNode(account)).length
+              }}个
+            </div>
+          </n-space>
 
           <n-data-table
             :columns="columns"
@@ -67,13 +77,6 @@
               showQuickJumper: true
             }"
           />
-          <n-space class="my-2">
-            <div class="text-sm">
-              共{{ accounts.length }}个，已注册{{
-                accounts.filter((account) => account.registered).length
-              }}个
-            </div>
-          </n-space>
         </n-tab-pane>
         <n-tab-pane name="logs" tab="日志">
           <n-log
@@ -106,6 +109,14 @@ interface RowData {
 }
 const message = useMessage()
 const loading = ref(false)
+const isRunningNode = (row: RowData) => {
+  return (
+    row.nodeRunning &&
+    moment().format('YYYY-MM-DD') ===
+      moment(row.nodeRunning).format('YYYY-MM-DD') &&
+    moment(row.nodeRunning).hour() > 8
+  )
+}
 const columns: DataTableColumns<RowData> = [
   {
     title: '#',
@@ -148,12 +159,7 @@ const columns: DataTableColumns<RowData> = [
     key: 'nodeRunning',
     width: 100,
     render(row) {
-      const isRunning =
-        row.nodeRunning &&
-        moment().format('YYYY-MM-DD') ===
-          moment(row.nodeRunning).format('YYYY-MM-DD') &&
-        moment(row.nodeRunning).hour() > 8
-      return isRunning ? '运行中' : '未运行'
+      return isRunningNode(row) ? '运行中' : '未运行'
     }
   },
   {
@@ -189,7 +195,6 @@ const accounts = ref<RowData[]>([])
 const batchCreateWalletCount = ref(50)
 
 const batchCreateWallet = () => {
-  console.log(batchCreateWalletCount.value)
   if (batchCreateWalletCount.value <= 0) {
     message.error('数量必须大于0')
     return
@@ -209,7 +214,6 @@ const stopMonadScore = () => {
 onMounted(() => {
   const { referralCode, concurrency, proxyMode, proxyApiUrl, wallets } =
     window.api.get('monadScore')
-  console.log(referralCode, concurrency, proxyMode, proxyApiUrl, wallets)
   runningInfo.referralCode = referralCode
   runningInfo.concurrency = concurrency
   runningInfo.proxyMode = proxyMode

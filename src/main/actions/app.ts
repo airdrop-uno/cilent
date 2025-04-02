@@ -150,7 +150,6 @@ export const AppActions: Record<
     _event: IpcMainEvent,
     options: { count: number; country: string }
   ): Promise<void> => {
-    console.log(options)
     const accounts = Array.from({ length: options.count }, () => {
       const firstName = faker.person.firstName()
       const lastName = faker.person.lastName()
@@ -173,7 +172,6 @@ export const AppActions: Record<
         gender: '1'
       }
     })
-    console.log(accounts)
     const oldAccounts = electronStore.get('gmailAccounts')
     const newAccounts = [...accounts, ...oldAccounts]
     while (accounts.length > 0) {

@@ -9,7 +9,6 @@ const api = {
   },
 
   get: <Key extends NestKey<Store>>(key: Key): NestValue<Store, Key> => {
-    console.log(key)
     return ipcRenderer.sendSync('get', key)
   }
 }

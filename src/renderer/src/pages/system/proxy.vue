@@ -88,32 +88,43 @@ const columns: DataTableColumns<RowData> = [
     fixed: 'left'
   },
   {
+    title: '状态',
+    key: 'status',
+    width: 80,
+    fixed: 'left',
+    render: (row) => {
+      const map = {
+        0: '未检测',
+        1: '正常',
+        2: '异常'
+      }
+      return map[row.status]
+    }
+  },
+  {
     title: '协议',
-    key: 'protocol'
+    key: 'protocol',
+    width: 60
   },
   {
     title: '用户名',
-    key: 'username'
+    key: 'username',
+    width: 160
   },
   {
     title: '密码',
-    key: 'password'
+    key: 'password',
+    width: 160
   },
   {
     title: 'host',
-    key: 'host'
+    key: 'host',
+    width: 160
   },
   {
     title: '端口',
-    key: 'port'
-  },
-  {
-    title: '状态',
-    key: 'status'
-  },
-  {
-    title: '操作',
-    key: 'action'
+    key: 'port',
+    width: 60
   }
 ]
 const staticIps = ref<RowData[]>([])
@@ -132,7 +143,7 @@ const checkProxy = () => {
     message.success('检测完成')
     loading.value = false
     checkedRowKeys.value = []
-    window.api.set('staticProxy', [...staticIps.value])
+    window.api.set('staticProxy', toRaw(staticIps.value))
   })
 }
 const batchDeleteProxy = () => {

@@ -14,7 +14,6 @@ const props = defineProps<{
   eventLog: string
 }>()
 onMounted(() => {
-  console.log(props.eventLog)
   window.electron.ipcRenderer.on(
     props.eventLog,
     (_event, log: { type: string; message: string }) => {
