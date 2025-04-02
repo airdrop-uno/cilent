@@ -71,6 +71,11 @@ const routes: RouteRecordRaw[] = [
         path: '/depin/monadScore',
         name: 'MonadScore',
         component: () => import('@/pages/depin/monadScore.vue')
+      },
+      {
+        path: '/depin/flow3',
+        name: 'Flow3',
+        component: () => import('@/pages/depin/flow3.vue')
       }
     ]
   },

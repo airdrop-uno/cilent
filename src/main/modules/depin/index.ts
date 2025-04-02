@@ -7,6 +7,7 @@ import axios from 'axios'
 import crypto from 'crypto'
 import nacl from 'tweetnacl'
 import bs58 from 'bs58'
+import https from 'https'
 import * as chrome from 'selenium-webdriver/chrome'
 import { Builder, By, WebDriver } from 'selenium-webdriver'
 import { getRandomUserAgent } from '../../config/userAgent'
@@ -30,6 +31,8 @@ export class DePIN {
   protected cronTask: ScheduledTask | null = null
   protected proxyMode: ProxyMode = 'None'
   protected proxyDynamicUrl: string = ''
+  protected timers: NodeJS.Timeout[] = []
+  protected cronTasks: ScheduledTask[] = []
   constructor(
     event: IpcMainEvent,
     name: string,
@@ -83,6 +86,14 @@ export class DePIN {
     if (this.cronTask) {
       this.cronTask.stop()
     }
+    for (const timer of this.timers) {
+      clearInterval(timer)
+    }
+    for (const cronTask of this.cronTasks) {
+      cronTask.stop()
+    }
+    this.cronTasks = []
+    this.timers = []
   }
   preRun() {
     if (this.isRunning) {
@@ -113,6 +124,7 @@ export class DePIN {
       const res = await axios.get(this.proxyDynamicUrl)
       httpsAgent = getProxyAgent(res.data)
     }
+    console.log(httpsAgent)
     return {
       headers: {
         ...this.defaultHeaders,
@@ -126,10 +138,22 @@ export class DePIN {
   logger(message: string) {
     this.event.reply(`${this.name}Log`, { type: 'info', message })
   }
+  toast(message: string) {
+    this.event.reply('toastMessage', {
+      status: 'info',
+      message
+    })
+  }
 
   get randomProxy(): StaticProxyItem {
     const list = electronStore.get('staticProxy')
     return list[Math.floor(Math.random() * list.length)]
+  }
+
+  get now(): string {
+    return new Date().toLocaleString('en-US', {
+      timeZone: 'Asia/Shanghai'
+    })
   }
 
   signMessage(message: string, privateKey: string) {
@@ -300,6 +324,21 @@ export class DePIN {
           throw new Error('网站无法访问，请检查网络连接和代理设置')
         }
       }
+    }
+  }
+
+  async requestWithRetry(
+    callback: () => Promise<void>,
+    retry: () => Promise<void>
+  ) {
+    try {
+      await callback()
+    } catch (error: any) {
+      if (error.response && error.response.status === 401) {
+        await retry()
+        return await callback()
+      }
+      throw error
     }
   }
 }

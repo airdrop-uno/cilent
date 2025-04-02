@@ -28,7 +28,7 @@ export const FaucetActions: Record<
       mkdirSync(snapshotFolder, { recursive: true })
     }
     // 创建钱包
-    const accounts = createAccount(amount)
+    const accounts = await createAccount(amount)
     // 领取代币
     for (const account of accounts) {
       await mintFaucet(account, snapshotFolder, event, { headless })

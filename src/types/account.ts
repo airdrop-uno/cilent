@@ -16,7 +16,7 @@ export interface MonadScoreWallet extends UniqueWallet {
   registered?: boolean
   claimedTasks?: string[]
   taskCompleted?: number
-  nodeRunning?: Date
+  lastRun?: Date
   message?: string
   loginToken?: string
   token?: string
@@ -90,14 +90,15 @@ export interface ParasailAccount extends Wallet {
 }
 
 export interface Flow3Account extends Wallet {
-  accessToken: string
+  token: string
   userAgent?: string
   proxy?: string
   message?: string
   totalEarningPoint?: number
   todayEarningPoint?: number
-  status?: string
   lastRun?: Date
+  lastDailyTask?: Date
+  hasDailyTask?: boolean
 }
 export interface HaioAccount extends Wallet {
   token: string

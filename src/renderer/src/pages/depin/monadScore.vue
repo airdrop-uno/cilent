@@ -96,6 +96,8 @@ import { DataTableColumns } from 'naive-ui'
 import { onMounted, reactive, ref, toRaw } from 'vue'
 import { useMessage } from 'naive-ui'
 import moment from 'moment'
+import { useClipboard } from '@vueuse/core'
+import { useAppStore } from '@renderer/store'
 interface RowData {
   address: string
   referralCode: string
@@ -103,18 +105,23 @@ interface RowData {
   proxy: string
   registered: boolean
   message: string
-  nodeRunning: Date
+  lastRun: Date
   claimedTasks: string[]
   taskCompleted: number
 }
+const { copy } = useClipboard()
 const message = useMessage()
+const appStore = useAppStore()
 const loading = ref(false)
 const isRunningNode = (row: RowData) => {
   return (
-    row.nodeRunning &&
-    moment().format('YYYY-MM-DD') ===
-      moment(row.nodeRunning).format('YYYY-MM-DD') &&
-    moment(row.nodeRunning).hour() > 8
+    row.lastRun &&
+    moment(
+      new Date().toLocaleString('en-US', {
+        timeZone: 'Asia/Shanghai'
+      })
+    ).format('YYYY-MM-DD') === moment(row.lastRun).format('YYYY-MM-DD') &&
+    moment(row.lastRun).hour() > 8
   )
 }
 const columns: DataTableColumns<RowData> = [
@@ -128,10 +135,18 @@ const columns: DataTableColumns<RowData> = [
     }
   },
   {
-    title: '地址',
+    title: '钱包地址',
     key: 'address',
     fixed: 'left',
-    width: 250
+    width: 250,
+    cellProps(rowData) {
+      return {
+        onClick: () => {
+          copy(rowData.address)
+          message.success('地址已复制')
+        }
+      }
+    }
   },
   {
     title: '积分',
@@ -156,7 +171,7 @@ const columns: DataTableColumns<RowData> = [
   },
   {
     title: '运行状态',
-    key: 'nodeRunning',
+    key: 'lastRun',
     width: 100,
     render(row) {
       return isRunningNode(row) ? '运行中' : '未运行'
@@ -199,9 +214,11 @@ const batchCreateWallet = () => {
     message.error('数量必须大于0')
     return
   }
+  appStore.globalLoading = true
+  appStore.loadingText = '批量创建钱包中，请稍后...'
   window.electron.ipcRenderer.send(
     'batchCreateWallet',
-    batchCreateWalletCount.value
+    toRaw(batchCreateWalletCount.value)
   )
 }
 const startMonadScore = () => {
@@ -224,6 +241,7 @@ onMounted(() => {
     'updateMonadScoreAccounts',
     (_event, _accounts) => {
       accounts.value = [..._accounts] as any
+      appStore.globalLoading = false
     }
   )
 

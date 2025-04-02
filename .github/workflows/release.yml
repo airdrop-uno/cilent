@@ -48,25 +48,26 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: bun run build:win
 
-      - name: Upload to Supabase Storage
+      - name: Upload to oss server
         env:
-          SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
-          SUPABASE_ANOE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+          OSS_BUCKET: ${{ secrets.OSS_BUCKET }}
+          OSS_REGION: ${{ secrets.OSS_REGION }}
         run: |
-          # 安装 Supabase CLI
-          # bun install @supabase/supabase-js
+          # bun install ali-oss
 
           # 运行上传脚本
           # bun upload.mjs
 
       - name: release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v0.1.7
         with:
-          generate_release_notes: true
           draft: true
           files: |
             dist/*.exe
             dist/*.zip
             dist/*.dmg
+            dist/*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}

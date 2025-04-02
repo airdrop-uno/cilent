@@ -64,6 +64,7 @@ export interface Store {
   }
   flow3: {
     wallets: Flow3Account[]
+    inviteCode: string
     concurrency: number
     proxyMode: string
     proxyApiUrl: string

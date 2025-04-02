@@ -22,7 +22,7 @@ export const EtherActions: Record<
     }
   },
   createAccount: async (event: IpcMainEvent, amount: number): Promise<void> => {
-    const accounts = createAccount(amount)
+    const accounts = await createAccount(amount)
     const currentAccounts = [...accounts, ...electronStore.get('accounts')]
     electronStore.set('accounts', currentAccounts)
     event.reply('createAccount', currentAccounts)

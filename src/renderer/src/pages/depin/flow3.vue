@@ -1,25 +1,26 @@
 <template>
-  <n-card class="h-full" title="Flow3">
+  <n-card title="Flow3" style="height: 100vh">
     <n-tabs>
       <n-tab-pane name="dashboard" tab="面板">
-        <n-space>
-          <n-input-number v-model:value="runningInfo.interval">
-            <template #prefix>轮询间隔：</template>
-            <template #suffix>秒</template>
-          </n-input-number>
-          <n-input-number v-model:value="runningInfo.concurrency">
+        <n-space class="mb-2">
+          <n-input v-model:value="runningInfo.inviteCode" class="w-[200px]">
+            <template #prefix>邀请码：</template>
+          </n-input>
+          <n-input-number
+            v-model:value="runningInfo.concurrency"
+            class="w-[160px]"
+          >
             <template #prefix>并发数：</template>
           </n-input-number>
           <n-select
             v-model:value="runningInfo.proxyMode"
+            class="w-[120px]"
             :options="[
               { label: '不使用代理', value: 'None' },
               { label: '静态代理', value: 'Static' },
               { label: '动态代理', value: 'Dynamic' }
             ]"
-          >
-            <template #header>代理模式</template>
-          </n-select>
+          />
 
           <n-input
             v-if="runningInfo.proxyMode === 'Dynamic'"
@@ -28,7 +29,7 @@
             <template #prefix>代理API：</template>
           </n-input>
         </n-space>
-        <n-space class="mb-[16px] flex items-center gap-2">
+        <n-space class="mb-2 flex items-center gap-2">
           <n-button type="primary" @click="startFlow3">启动</n-button>
           <n-button type="primary" @click="stopFlow3">停止</n-button>
           <n-popconfirm
@@ -71,13 +72,16 @@
   </n-card>
 </template>
 <script setup lang="ts">
-import { ref, onMounted, reactive } from 'vue'
-import { DataTableColumns } from 'naive-ui'
+import { ref, onMounted, reactive, toRaw } from 'vue'
+import { DataTableColumns, useMessage } from 'naive-ui'
+import { useAppStore } from '@renderer/store'
 interface RowData {
   address: string
   accessToken: string
   proxy?: string
 }
+const message = useMessage()
+const appStore = useAppStore()
 const columns: DataTableColumns<RowData> = [
   {
     title: '#',
@@ -88,7 +92,7 @@ const columns: DataTableColumns<RowData> = [
     }
   },
   {
-    title: '地址',
+    title: '钱包地址',
     key: 'address',
     fixed: 'left',
     width: 250
@@ -96,11 +100,17 @@ const columns: DataTableColumns<RowData> = [
   {
     title: '状态',
     key: 'status',
+    fixed: 'left',
     width: 250
   },
   {
-    title: '执行时间',
-    key: 'running',
+    title: '日常签到',
+    key: 'dailyTask',
+    width: 250
+  },
+  {
+    title: 'Twitter任务',
+    key: 'twitterTask',
     width: 250
   },
   {
@@ -118,25 +128,37 @@ const data = ref<RowData[]>([])
 const logs = ref<string[]>([])
 const batchCreateWalletCount = ref(50)
 const runningInfo = reactive({
-  interval: 10,
+  inviteCode: '',
   concurrency: 10,
   proxyMode: 'None',
   proxyApiUrl: ''
 })
 const startFlow3 = () => {
-  window.electron.ipcRenderer.send('startFlow3', runningInfo)
+  window.electron.ipcRenderer.send('startFlow3', toRaw(runningInfo))
 }
 const stopFlow3 = () => {
   window.electron.ipcRenderer.send('stopFlow3')
-  window.api.set('monadScore.concurrency', runningInfo.concurrency)
 }
 const batchCreateWallet = () => {
+  if (batchCreateWalletCount.value <= 0) {
+    message.error('数量必须大于0')
+    return
+  }
+  appStore.globalLoading = true
+  appStore.loadingText = '批量创建钱包中，请稍后...'
   window.electron.ipcRenderer.send(
-    'batchCreateWallet',
+    'batchCreateFlow3Wallet',
     batchCreateWalletCount.value
   )
 }
 onMounted(() => {
+  const { concurrency, inviteCode, wallets, proxyApiUrl, proxyMode } =
+    window.api.get('flow3')
+  runningInfo.concurrency = concurrency
+  runningInfo.inviteCode = inviteCode
+  runningInfo.proxyApiUrl = proxyApiUrl
+  runningInfo.proxyMode = proxyMode
+  data.value = wallets as any
   window.electron.ipcRenderer.on(
     'flow3Log',
     (_event, log: { type: string; message: string }) => {
@@ -146,5 +168,9 @@ onMounted(() => {
       }
     }
   )
+  window.electron.ipcRenderer.on('updateFlow3Accounts', (_, accounts) => {
+    data.value = accounts
+    appStore.globalLoading = false
+  })
 })
 </script>

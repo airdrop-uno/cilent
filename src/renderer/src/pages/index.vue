@@ -1,5 +1,5 @@
 <template>
-  <n-space vertical class="overflow-hidden" style="height: 100vh">
+  <n-space vertical class="overflow-hidden">
     <n-layout has-sider style="background-color: null" class="h-full">
       <n-layout-sider
         v-if="appStore.isActive"
@@ -9,7 +9,8 @@
         :width="200"
         :collapsed="collapsed"
         show-trigger
-        class="overflow-y-hidden h-full"
+        class="overflow-y-hidden"
+        style="height: 100vh"
         @collapse="collapsed = true"
         @expand="collapsed = false"
       >

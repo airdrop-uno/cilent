@@ -1,7 +1,10 @@
 <template>
   <n-card title="" style="height: 100vh">
     <div class="h-full flex flex-col items-center justify-center gap-4">
-      <n-input-group v-if="!appStore.isActive" class="w-[300px]">
+      <!-- <n-input-group
+        v-if="!appStore.isActive && !appStore.globalLoading"
+        class="w-[300px]"
+      >
         <n-input
           v-model:value="activationCode"
           placeholder="输入激活码"
@@ -14,7 +17,7 @@
         >
           激活
         </n-button>
-      </n-input-group>
+      </n-input-group> -->
 
       <ContractMe />
     </div>

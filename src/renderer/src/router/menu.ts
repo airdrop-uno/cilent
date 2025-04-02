@@ -143,6 +143,10 @@ export const menuOptions: MenuOption[] = [
         label: () =>
           h(RouterLink, { to: { path: '/depin/monadScore' } }, 'MonadScore'),
         key: '/depin/monadScore'
+      },
+      {
+        label: () => h(RouterLink, { to: { path: '/depin/flow3' } }, 'Flow3'),
+        key: '/depin/flow3'
       }
     ]
   },

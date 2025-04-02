@@ -1,49 +1,31 @@
-import { createClient } from '@supabase/supabase-js'
+import oss from 'ali-oss'
 import fs from 'fs'
 import path from 'path'
-const supabase = createClient(
-  process.env.SUPABASE_PROJECT_URL,
-  process.env.SUPABASE_ANOE_KEY,
-  {
-    auth: {
-      persistSession: false
-    }
-  }
-)
+import glob from 'glob'
+
+const client = new oss({
+  region: process.env.OSS_REGION,
+  bucket: process.env.OSS_BUCKET,
+  accessKeyId: process.env.OSS_ACCESS_KEY_ID,
+  accessKeySecret: process.env.OSS_ACCESS_KEY_SECRET
+})
 
 async function uploadFile(filePath) {
   const fileName = path.basename(filePath)
   const file = await fs.promises.readFile(filePath)
-  const { data, error } = await supabase.storage
-    .from('client-releases')
-    .upload(`${process.env.GITHUB_REF_NAME}/${fileName}`, file, {
-      cacheControl: '3600',
-      upsert: true
-    })
-
-  if (error) {
-    throw error
-  }
-  return data
+  const { url } = await client.put(
+    `releases/${process.env.GITHUB_REF_NAME}/${fileName}`,
+    file
+  )
+  console.log(`Uploaded ${fileName} to ${url}`)
+  return
 }
 
 async function uploadFiles() {
-  const distPath = path.join(process.cwd(), 'dist')
-  const files = await fs.promises.readdir(distPath)
+  const files = glob.sync('dist/*.{exe,zip,dmg,tar.gz}')
 
-  for (const file of files) {
-    if (
-      file.endsWith('.exe') ||
-      file.endsWith('.dmg') ||
-      file.endsWith('.mjs') ||
-      file.endsWith('.zip')
-    ) {
-      const filePath = path.join(distPath, file)
-      console.log(`Uploading ${file}...`)
-      await uploadFile(filePath)
-      console.log(`Successfully uploaded ${file}`)
-    }
-  }
+  // 并行上传所有文件
+  await Promise.all(files.map(uploadFile))
 }
 
 uploadFiles().catch(console.error)

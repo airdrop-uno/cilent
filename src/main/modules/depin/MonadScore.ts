@@ -18,12 +18,15 @@ const tasks = [
   {
     title: 'Retweet this post',
     id: 'task003'
+  },
+  {
+    title: 'Collect Bonus points',
+    id: 'task101'
   }
 ]
 export default class MonadScore extends DePIN {
   constructor(event: IpcMainEvent) {
     super(event, 'monadScore', {
-      intervalSeconds: 30 * 1000,
       baseURL: 'https://mscore.onrender.com',
       defaultHeaders: {
         Accept: 'application/json, text/plain, */*',
@@ -36,10 +39,10 @@ export default class MonadScore extends DePIN {
   }
   validRunning(wallet: MonadScoreWallet) {
     return (
-      wallet.nodeRunning &&
-      moment().format('YYYY-MM-DD') ===
-        moment(wallet.nodeRunning).format('YYYY-MM-DD') &&
-      moment(wallet.nodeRunning).hour() > 8
+      wallet.lastRun &&
+      moment(new Date(this.now)).format('YYYY-MM-DD') ===
+        moment(new Date(wallet.lastRun)).format('YYYY-MM-DD') &&
+      moment(new Date(wallet.lastRun)).hour() > 8
     )
   }
   updateWallet(wallet: MonadScoreWallet) {
@@ -57,45 +60,76 @@ export default class MonadScore extends DePIN {
       this.logger(`${wallet.address} node already started today`)
       return
     }
-    const { headers, httpsAgent } = await this.getHeaders(wallet)
-    this.logger(`start Node ${wallet.address}`)
     if (!wallet.token) {
       await this.refreshToken(wallet)
     }
-    try {
-      const start = await this.request.put<{
-        success: boolean
-        user: {
-          totalPoints: number
-        }
-      }>(
-        '/user/update-start-time',
-        {
-          wallet: wallet.address,
-          startTime: Date.now()
-        },
-        {
-          headers,
-          httpsAgent
-        }
-      )
-      if (start.success) {
-        wallet.nodeRunning = new Date()
+    this.logger(`start Node ${wallet.address}`)
+    this.requestWithRetry(
+      async () => {
+        const { headers, httpsAgent } = await this.getHeaders(wallet)
+        wallet.message = '节点启动中...'
+        const start = await this.request.put<{
+          success: boolean
+          user: {
+            totalPoints: number
+            claimedTasks: string[]
+          }
+        }>(
+          '/user/update-start-time',
+          {
+            wallet: wallet.address,
+            startTime: Date.now()
+          },
+          {
+            headers,
+            httpsAgent
+          }
+        )
+        wallet.lastRun = new Date(this.now)
         wallet.message = '节点启动成功'
         wallet.points = start.user.totalPoints
+        wallet.claimedTasks = start.user.claimedTasks
+
+        const tasksAvailable = tasks.filter(
+          (t) => !wallet.claimedTasks?.includes(t.id)
+        )
+        if (tasksAvailable.length > 0) {
+          this.logger(
+            `${wallet.address} 检测到有任务${tasksAvailable.map((i) => i.id).join('、')}可完成，开始完成任务...`
+          )
+          for (const task of tasksAvailable) {
+            this.logger(`尝试完成任务: ${task.id} | ${task.title}...`)
+            await this.requestWithRetry(
+              async () => {
+                await this.request.post(
+                  '/user/claim-task',
+                  {
+                    wallet: wallet.address,
+                    taskId: task.id
+                  },
+                  {
+                    headers,
+                    httpsAgent
+                  }
+                )
+                wallet.claimedTasks?.push(task.id)
+                this.logger(`完成任务 ${task.id} | ${task.title} 成功`)
+              },
+              async () => {
+                await this.refreshToken(wallet)
+              }
+            )
+            await sleep(Math.random() * 3)
+          }
+          await this.refreshToken(wallet)
+        }
         this.updateWallet(wallet)
-        return this.logger(`Start Node ${wallet.address} success`)
-      }
-      wallet.message = '节点启动失败'
-      this.updateWallet(wallet)
-      throw new Error(`Start Node ${wallet.address} failed`)
-    } catch (error: any) {
-      if (error.response && error.response.status === 401) {
+        return this.logger(`节点启动 ${wallet.address} 成功`)
+      },
+      async () => {
         await this.refreshToken(wallet)
-        await this.startNode(wallet)
       }
-      wallet.message = error.message
-    }
+    )
   }
   async getLoginToken(wallet: MonadScoreWallet) {
     const { referralCode } = electronStore.get('monadScore')
@@ -113,105 +147,60 @@ export default class MonadScore extends DePIN {
     )
     if (success) {
       wallet.loginToken = token
-      this.updateWallet(wallet)
-      this.logger(`getLoginToken ${wallet.address} success`)
+      wallet.message = '获取登录Token成功'
+      this.logger(`${wallet.address} 获取登录Token成功`)
       return token
     }
-    this.logger(`getLoginToken ${wallet.address} failed`)
-    throw new Error(`getLoginToken ${wallet.address} failed`)
+    wallet.message = '获取登录Token失败'
+    this.logger(`${wallet.address} 获取登录Token失败`)
+    throw new Error(`${wallet.address} 获取登录Token失败`)
   }
   async refreshToken(wallet: MonadScoreWallet) {
     const { headers, httpsAgent } = await this.getHeaders(wallet)
     if (!wallet.loginToken) {
       await this.getLoginToken(wallet)
     }
-    this.logger(`refreshToken ${wallet.address}`)
-    try {
-      const { success, token, user } = await this.request.post<{
-        success: boolean
-        token: string
-        user: {
-          claimedTasks: string[]
-          totalPoints: number
-          referralCode: string
-        }
-      }>(
-        '/user/login',
-        {
-          wallet: wallet.address
-        },
-        {
-          headers: {
-            ...headers,
-            Authorization: `Bearer ${wallet.loginToken}`
+    this.logger(`${wallet.address} 刷新Token...`)
+    await this.requestWithRetry(
+      async () => {
+        const { success, token, user } = await this.request.post<{
+          success: boolean
+          token: string
+          user: {
+            claimedTasks: string[]
+            totalPoints: number
+            referralCode: string
+          }
+        }>(
+          '/user/login',
+          {
+            wallet: wallet.address
           },
-          httpsAgent
-        }
-      )
-      if (success) {
-        wallet.token = token
-        wallet.referralCode = user.referralCode
-        wallet.points = user.totalPoints
-        wallet.claimedTasks = user.claimedTasks
-        this.updateWallet(wallet)
-        this.logger(`refreshToken ${wallet.address} success`)
-        return
-      }
-      throw new Error(`refreshToken ${wallet.address} failed`)
-    } catch (error: any) {
-      if (error.response && error.response.status === 401) {
-        await this.getLoginToken(wallet)
-        return await this.refreshToken(wallet)
-      }
-      throw error
-    }
-  }
-
-  async process(wallet: MonadScoreWallet) {
-    if (!wallet.registered) {
-      await this.getLoginToken(wallet)
-      await this.refreshToken(wallet)
-    }
-    if (
-      wallet.registered &&
-      (wallet.claimedTasks?.length === tasks.length ||
-        wallet.taskCompleted === 3)
-    ) {
-      this.logger(`${wallet.address} has completed all tasks`)
-      return this.startNode(wallet)
-    }
-    const tasksAvailable = tasks.filter(
-      (t) => !wallet.claimedTasks?.includes(t.id)
-    )
-    if (tasksAvailable.length === 0 || wallet.taskCompleted === 3) {
-      this.logger(`No tasks available for ${wallet.address}`)
-      return this.startNode(wallet)
-    }
-    const { headers, httpsAgent } = await this.getHeaders(wallet)
-    for (const task of tasksAvailable) {
-      this.logger(`Trying complete task: ${task.id} | ${task.title}...`)
-      const res = await this.request.post(
-        '/user/claim-task',
-        {
-          wallet: wallet.address,
-          taskId: task.id
-        },
-        {
-          headers,
-          httpsAgent
-        }
-      )
-      if (res.success) {
-        this.logger(`Complete task ${task.id} | ${task.title} success`)
-      } else {
-        this.logger(
-          `Can't complete task ${task.id} | ${task.title} | ${JSON.stringify(res)}...`
+          {
+            headers: {
+              ...headers,
+              Authorization: `Bearer ${wallet.loginToken}`
+            },
+            httpsAgent
+          }
         )
+        if (success) {
+          wallet.token = token
+          wallet.referralCode = user.referralCode
+          wallet.points = user.totalPoints
+          wallet.claimedTasks = user.claimedTasks
+          wallet.registered = true
+          wallet.message = '刷新Token成功'
+          this.updateWallet(wallet)
+          this.logger(`${wallet.address} 刷新Token成功`)
+          return
+        }
+      },
+      async () => {
+        this.getLoginToken(wallet)
       }
-    }
-    await this.startNode(wallet)
+    )
   }
-
   async run() {
     this.preRun()
     const execute = () => {
@@ -224,15 +213,15 @@ export default class MonadScore extends DePIN {
       for (let i = 0; i < wallets.length; i++) {
         const wallet = wallets[i]
         if (this.validRunning(wallet)) {
-          this.logger(`${wallet.address} node already started today`)
+          this.logger(`${wallet.address} 节点已启动！跳过...`)
           continue
         }
-        if (!wallet.proxy && this.proxyMode === 'Static') {
+        if (!wallet.proxy && this.proxyMode === 'Static' && list.length > 0) {
           wallet.proxy = list[i % list.length].url
         }
         this.queue.add(async () => {
           try {
-            await this.process(wallet)
+            await this.startNode(wallet)
           } catch (error: any) {
             this.logger(`Error: ${error.message}`)
             console.error(error)
@@ -244,10 +233,14 @@ export default class MonadScore extends DePIN {
     }
 
     execute()
-    this.cronTask = Cron.schedule('0 1 8 * *', async () => {
-      this.logger('Start MonadScore at 8:01')
-      await sleep(Math.random() * 10)
-      execute()
-    })
+    this.cronTask = Cron.schedule(
+      '0 1 8 * *',
+      async () => {
+        this.logger('Start MonadScore at 8:01')
+        await sleep(Math.random() * 10)
+        execute()
+      },
+      { timezone: 'Asia/Shanghai' }
+    )
   }
 }
