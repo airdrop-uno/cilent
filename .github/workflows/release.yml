@@ -70,4 +70,4 @@ jobs:
             dist/*.dmg
             dist/*.tar.gz
         env:
-          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ADMIN_TOKEN }}
