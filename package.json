@@ -1,13 +1,14 @@
 {
   "name": "airdrop.uno",
-  "version": "1.0.0",
-  "description": "An Electron application with Vue and TypeScript",
+  "version": "1.0.3",
+  "description": "An airdrop assistant for you",
   "main": "./out/main/index.js",
-  "author": "example.com",
+  "author": "airdrop.uno.ai@gmail.com",
   "type": "module",
-  "homepage": "https://electron-vite.org",
+  "homepage": "https://airdrop.uno",
   "scripts": {
     "prepare": "husky install",
+    "preinstall": "npx only-allow bun",
     "format": "prettier --write .",
     "lint": "eslint --cache .",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
@@ -22,9 +23,6 @@
     "build:linux": "npm run build && electron-builder --linux"
   },
   "lint-staged": {
-    ".{vue,ts}": [
-      "typecheck"
-    ],
     "*.{vue,js,ts,jsx,tsx}": [
       "eslint --fix",
       "prettier --write"
@@ -95,5 +93,9 @@
     "prettier": "^3.5.1",
     "typescript": "^5.7.3",
     "vue-tsc": "^2.2.2"
+  },
+  "engines": {
+    "node": ">=20",
+    "bun": ">=1.0.0"
   }
 }

@@ -116,14 +116,11 @@ const loading = ref(false)
 const isRunningNode = (row: RowData) => {
   return (
     row.lastRun &&
-    moment(
-      new Date().toLocaleString('en-US', {
-        timeZone: 'Asia/Shanghai'
-      })
-    ).format('YYYY-MM-DD') === moment(row.lastRun).format('YYYY-MM-DD') &&
-    moment(row.lastRun).hour() > 8
+    moment.utc().format('YYYY-MM-DD') ===
+      moment(row.lastRun).format('YYYY-MM-DD')
   )
 }
+// 2025-04-04 00:14:13
 const columns: DataTableColumns<RowData> = [
   {
     title: '#',
@@ -249,9 +246,7 @@ onMounted(() => {
     'monadScoreLog',
     (_event, log: { type: string; message: string }) => {
       logs.value.push(`[${new Date().toLocaleString()}] ${log.message}`)
-      if (logs.value.length > 1000) {
-        logs.value = logs.value.slice(-1000)
-      }
+      logs.value = logs.value.slice(-40)
     }
   )
 })

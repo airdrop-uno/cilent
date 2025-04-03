@@ -16,7 +16,8 @@ import {
   ParasailAccount,
   Flow3Account,
   HaioAccount,
-  MonadScoreWallet
+  MonadScoreWallet,
+  IncentivAccount
 } from '../types/account'
 
 export interface StaticProxyItem {
@@ -64,10 +65,13 @@ export interface Store {
   }
   flow3: {
     wallets: Flow3Account[]
-    inviteCode: string
+    referralCode: string
     concurrency: number
     proxyMode: string
     proxyApiUrl: string
+  }
+  incentiv: {
+    accounts: IncentivAccount[]
   }
 }
 export const electronStore = new ElectronStore<Store>({
@@ -171,6 +175,12 @@ export const electronStore = new ElectronStore<Store>({
         concurrency: os.cpus().length,
         proxyMode: 'None',
         proxyApiUrl: ''
+      }
+    },
+    incentiv: {
+      type: 'object',
+      default: {
+        accounts: []
       }
     }
   }

@@ -40,9 +40,9 @@ export default class MonadScore extends DePIN {
   validRunning(wallet: MonadScoreWallet) {
     return (
       wallet.lastRun &&
-      moment(new Date(this.now)).format('YYYY-MM-DD') ===
-        moment(new Date(wallet.lastRun)).format('YYYY-MM-DD') &&
-      moment(new Date(wallet.lastRun)).hour() > 8
+      moment(this.now).format('YYYY-MM-DD') ===
+        moment(wallet.lastRun).format('YYYY-MM-DD') &&
+      moment(wallet.lastRun).hour() > 0
     )
   }
   updateWallet(wallet: MonadScoreWallet) {
@@ -57,13 +57,13 @@ export default class MonadScore extends DePIN {
   async startNode(wallet: MonadScoreWallet) {
     // 判断节点启动时间是否是今天，并且是早上八点之后，如果是，则不启动节点
     if (this.validRunning(wallet)) {
-      this.logger(`${wallet.address} node already started today`)
+      this.logger(`${wallet.address} 节点已启动`)
       return
     }
     if (!wallet.token) {
       await this.refreshToken(wallet)
     }
-    this.logger(`start Node ${wallet.address}`)
+    this.logger(`${wallet.address} 节点启动中...`)
     this.requestWithRetry(
       async () => {
         const { headers, httpsAgent } = await this.getHeaders(wallet)
@@ -85,11 +85,11 @@ export default class MonadScore extends DePIN {
             httpsAgent
           }
         )
-        wallet.lastRun = new Date(this.now)
+        wallet.lastRun = this.now
         wallet.message = '节点启动成功'
         wallet.points = start.user.totalPoints
         wallet.claimedTasks = start.user.claimedTasks
-
+        wallet.registered = true
         const tasksAvailable = tasks.filter(
           (t) => !wallet.claimedTasks?.includes(t.id)
         )
@@ -98,7 +98,9 @@ export default class MonadScore extends DePIN {
             `${wallet.address} 检测到有任务${tasksAvailable.map((i) => i.id).join('、')}可完成，开始完成任务...`
           )
           for (const task of tasksAvailable) {
-            this.logger(`尝试完成任务: ${task.id} | ${task.title}...`)
+            this.logger(
+              `${wallet.address} 尝试完成任务: ${task.id} | ${task.title}...`
+            )
             await this.requestWithRetry(
               async () => {
                 await this.request.post(
@@ -113,7 +115,9 @@ export default class MonadScore extends DePIN {
                   }
                 )
                 wallet.claimedTasks?.push(task.id)
-                this.logger(`完成任务 ${task.id} | ${task.title} 成功`)
+                this.logger(
+                  `${wallet.address} 任务 ${task.id} | ${task.title} 成功`
+                )
               },
               async () => {
                 await this.refreshToken(wallet)
@@ -124,7 +128,7 @@ export default class MonadScore extends DePIN {
           await this.refreshToken(wallet)
         }
         this.updateWallet(wallet)
-        return this.logger(`节点启动 ${wallet.address} 成功`)
+        return this.logger(`${wallet.address} 节点启动成功`)
       },
       async () => {
         await this.refreshToken(wallet)
@@ -203,7 +207,7 @@ export default class MonadScore extends DePIN {
   }
   async run() {
     this.preRun()
-    const execute = () => {
+    const execute = async () => {
       const { referralCode, wallets } = electronStore.get('monadScore')
       if (!referralCode) return this.logger('Empty ReferralCode')
       if (wallets.length === 0) return this.logger('Empty Wallets')
@@ -219,7 +223,7 @@ export default class MonadScore extends DePIN {
         if (!wallet.proxy && this.proxyMode === 'Static' && list.length > 0) {
           wallet.proxy = list[i % list.length].url
         }
-        this.queue.add(async () => {
+        await this.queue.add(async () => {
           try {
             await this.startNode(wallet)
           } catch (error: any) {
@@ -233,14 +237,5 @@ export default class MonadScore extends DePIN {
     }
 
     execute()
-    this.cronTask = Cron.schedule(
-      '0 1 8 * *',
-      async () => {
-        this.logger('Start MonadScore at 8:01')
-        await sleep(Math.random() * 10)
-        execute()
-      },
-      { timezone: 'Asia/Shanghai' }
-    )
   }
 }
