@@ -26,6 +26,9 @@ jobs:
           package-name: airdrop-uno
           pull-request-title-pattern: "🔖 ${{ github.event.head_commit.message }}"
           token: ${{ secrets.ADMIN_TOKEN }}
+          version-file: "package.json"
+          extra-files: |
+            ["package.json"]
           changelog-types: |
             [
               {"type":"feat","section":"✨ Features","hidden":false},

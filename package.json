@@ -1,6 +1,6 @@
 {
-  "name": "airdrop.uno.art",
-  "version": "1.0.0",
+  "name": "airdrop.uno",
+  "version": "0.2.0",
   "description": "An Electron application with Vue and TypeScript",
   "main": "./out/main/index.js",
   "author": "example.com",
