@@ -327,12 +327,12 @@ export class DePIN {
     }
   }
 
-  async requestWithRetry(
-    callback: () => Promise<void>,
+  async requestWithRetry<T>(
+    callback: () => Promise<T>,
     retry: () => Promise<void>
-  ) {
+  ): Promise<T> {
     try {
-      await callback()
+      return await callback()
     } catch (error: any) {
       if (error.response && error.response.status === 401) {
         await retry()

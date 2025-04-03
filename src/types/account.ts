@@ -1,6 +1,6 @@
 export interface Wallet {
-  address?: string
-  privateKey?: string
+  address: string
+  privateKey: string
   mnemonic?: string
 }
 
@@ -106,4 +106,9 @@ export interface HaioAccount extends Wallet {
   proxy?: string
   address: string
   privateKey: string
+}
+export interface IncentivAccount extends Wallet {
+  token: string
+  registered: boolean
+  nextFaucetTimestamp: number
 }
