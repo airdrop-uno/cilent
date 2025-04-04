@@ -7,7 +7,6 @@ import axios from 'axios'
 import crypto from 'crypto'
 import nacl from 'tweetnacl'
 import bs58 from 'bs58'
-import https from 'https'
 import * as chrome from 'selenium-webdriver/chrome'
 import { Builder, By, WebDriver } from 'selenium-webdriver'
 import { getRandomUserAgent } from '../../config/userAgent'
@@ -19,6 +18,7 @@ import { electronStore, StaticProxyItem } from '../../store'
 import { HttpsProxyAgent } from 'https-proxy-agent'
 import { SocksProxyAgent } from 'socks-proxy-agent'
 import { ProxyMode } from '../../../types/account'
+import moment from 'moment'
 export class DePIN {
   protected event: IpcMainEvent
   protected queue: PQueue
@@ -124,11 +124,10 @@ export class DePIN {
       const res = await axios.get(this.proxyDynamicUrl)
       httpsAgent = getProxyAgent(res.data)
     }
-    console.log(httpsAgent)
     return {
       headers: {
         ...this.defaultHeaders,
-        'User-Agent': options.userAgent,
+        'User-Agent': options.userAgent || getRandomUserAgent(),
         ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
         ...extraHeaders
       },
@@ -151,9 +150,7 @@ export class DePIN {
   }
 
   get now(): string {
-    return new Date().toLocaleString('en-US', {
-      timeZone: 'Asia/Shanghai'
-    })
+    return moment().utc().format('YYYY-MM-DD HH:mm:ss')
   }
 
   signMessage(message: string, privateKey: string) {
@@ -334,7 +331,13 @@ export class DePIN {
     try {
       return await callback()
     } catch (error: any) {
-      if (error.response && error.response.status === 401) {
+      this.logger(`请求失败:${error.message}`)
+      if (
+        error.response &&
+        (error.response.status === 401 ||
+          error.response.data?.message?.includes?.('expired'))
+      ) {
+        this.logger(`token 已过期；重新登录...`)
         await retry()
         return await callback()
       }

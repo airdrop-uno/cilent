@@ -13,9 +13,9 @@ export const Flow3Actions: Record<
     event: IpcMainEvent,
     count: number
   ): Promise<void> => {
-    const walets = await createSolanaWallet(count)
+    const newWallets = await createSolanaWallet(count)
     const { wallets } = electronStore.get('flow3')
-    const currentAccounts = [...walets, ...wallets]
+    const currentAccounts = wallets.concat(newWallets)
     electronStore.set('flow3.wallets', currentAccounts)
     event.reply('updateFlow3Accounts', currentAccounts)
     event.reply('toastMessage', {
@@ -29,7 +29,7 @@ export const Flow3Actions: Record<
       concurrency: number
       proxyMode: ProxyMode
       proxyApiUrl: string
-      inviteCode: string
+      referralCode: string
     }
   ): Promise<void> => {
     flow3 ||= new Flow3(event)
@@ -37,12 +37,12 @@ export const Flow3Actions: Record<
       concurrency = os.cpus().length,
       proxyMode = 'Static',
       proxyApiUrl = '',
-      inviteCode = ''
+      referralCode = ''
     } = options
     electronStore.set('flow3.concurrency', concurrency)
     electronStore.set('flow3.proxyMode', proxyMode)
     electronStore.set('flow3.proxyApiUrl', proxyApiUrl)
-    electronStore.set('flow3.inviteCode', inviteCode)
+    electronStore.set('flow3.referralCode', referralCode)
     flow3.setConcurrency(concurrency)
     flow3.setProxyMode(proxyMode)
     flow3.setProxyDynamicUrl(proxyApiUrl)

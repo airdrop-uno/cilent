@@ -1,3 +1,5 @@
+import { Moment } from 'moment'
+
 export interface Wallet {
   address: string
   privateKey: string
@@ -16,7 +18,7 @@ export interface MonadScoreWallet extends UniqueWallet {
   registered?: boolean
   claimedTasks?: string[]
   taskCompleted?: number
-  lastRun?: Date
+  lastRun?: string
   message?: string
   loginToken?: string
   token?: string
@@ -90,15 +92,17 @@ export interface ParasailAccount extends Wallet {
 }
 
 export interface Flow3Account extends Wallet {
-  token: string
+  token?: string
   userAgent?: string
   proxy?: string
   message?: string
   totalEarningPoint?: number
   todayEarningPoint?: number
-  lastRun?: Date
-  lastDailyTask?: Date
+  referralEarningPoint?: number
+  lastRun?: string
+  lastDailyTask?: string
   hasDailyTask?: boolean
+  twitterTaskFinishedCount?: number
 }
 export interface HaioAccount extends Wallet {
   token: string

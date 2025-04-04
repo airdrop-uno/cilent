@@ -3,15 +3,16 @@ import { sleep } from '../../utils/common'
 
 const executeWithRetry = async <T>(
   callback: () => Promise<T>,
-  retry: number = 5
+  retry: number = 3
 ) => {
   for (let i = 1; i <= retry; i++) {
     try {
       const res = await callback()
       return res as T
-    } catch (error) {
-      if (i === retry) throw error
-      console.log(`Retry ${i}/${retry}`)
+    } catch (error: any) {
+      if (i === retry || error.response.status === 401) throw error
+      console.log(error.response)
+      console.log(`Retry ${i}/${retry} ${error.message} `)
       await sleep(Math.random() * 3)
     }
   }

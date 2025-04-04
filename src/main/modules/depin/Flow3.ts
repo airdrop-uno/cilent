@@ -8,13 +8,27 @@ import { electronStore } from '../../store'
 import { Flow3Account } from '../../../types/account'
 import moment from 'moment'
 import { sleep } from '../../utils/common'
+import { getRandomUserAgent } from '../../config/userAgent'
 const message = `Please sign this message to connect your wallet to Flow 3 and verifying your ownership only.`
 export default class Flow3 extends DePIN {
   constructor(event: IpcMainEvent) {
-    super(event, 'Flow3', {
+    super(event, 'flow3', {
       baseURL: 'https://api.flow3.tech',
       defaultHeaders: {
-        Origin: 'chrome-extension://lhmminnoafalclkgcbokfcngkocoffcp'
+        accept: 'application/json, text/plain, */*',
+        'accept-language': 'zh-CN,zh;q=0.9',
+        'content-type': 'application/json',
+        origin: 'https://dashboard.flow3.tech',
+        priority: 'u=1, i',
+        referer: 'https://dashboard.flow3.tech/',
+        'sec-ch-ua':
+          '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"macOS"',
+        'sec-fetch-dest': 'empty',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-site': 'same-site',
+        Origin: 'https://dashboard.flow3.tech'
       }
     })
   }
@@ -27,7 +41,10 @@ export default class Flow3 extends DePIN {
     electronStore.set('flow3.wallets', wallets)
   }
   async getToken(account: Flow3Account) {
-    this.logger(`获取Flow3 ${account.address}的token`)
+    if (!account.userAgent) {
+      account.userAgent = getRandomUserAgent()
+    }
+    this.logger(`${account.address} 获取token...`)
     const wallet = Keypair.fromSecretKey(
       bs58.decode(account.privateKey as string)
     )
@@ -35,42 +52,55 @@ export default class Flow3 extends DePIN {
       nacl.sign.detached(Buffer.from(message), new Uint8Array(wallet.secretKey))
     )
     const { headers, httpsAgent } = await this.getHeaders(account)
-    const errorMsg = `获取Flow3 ${account.address}的token失败`
+    const errorMsg = `${account.address} 获取token失败`
 
     try {
+      const { referralCode } = electronStore.get('flow3')
+      const body: Record<string, string> = {
+        message: message,
+        walletAddress: wallet.publicKey.toBase58(),
+        signature: signature
+      }
+      if (!account.token) {
+        body.referralCode = referralCode
+      }
       const {
         data: { accessToken }
       } = await this.request.post<{
         data: { accessToken: string }
-      }>(
-        '/v1/user/login',
-        {
-          message: message,
-          walletAddress: wallet.publicKey.toBase58(),
-          signature: signature
-        },
-        { headers, httpsAgent }
-      )
+      }>('/api/v1/user/login', body, { headers, httpsAgent })
       account.token = accessToken
       this.updateAccount(account)
-      this.logger(`获取Flow3 ${account.address}的token成功`)
+      this.logger(`${account.address} 获取token成功`)
     } catch (error: any) {
       this.logger(`${errorMsg}:${error.message}`)
       throw error
     }
   }
   async shareBandWidth(account: Flow3Account) {
-    this.logger(`共享Flow3 ${account.address}的带宽`)
-    this.requestWithRetry(
+    this.logger(`${account.address} 共享带宽...`)
+    await this.requestWithRetry(
       async () => {
         const { headers, httpsAgent } = await this.getHeaders(account)
         await this.request.post<{
           statusCode: number
-        }>('/api/v1/bandwidth', {}, { headers, httpsAgent })
-        account.lastRun = new Date(this.now)
+        }>(
+          '/api/v1/bandwidth',
+          {
+            walletAddress: account.address
+          },
+          {
+            headers: {
+              ...headers,
+              Origin: 'chrome-extension://lhmminnoafalclkgcbokfcngkocoffcp'
+            },
+            httpsAgent
+          }
+        )
+        account.lastRun = this.now
         account.message = '共享带宽成功'
         this.updateAccount(account)
-        this.logger(`共享Flow3 ${account.address}的带宽成功`)
+        this.logger(`${account.address} 共享带宽成功`)
       },
       async () => {
         await this.getToken(account)
@@ -91,37 +121,41 @@ export default class Flow3 extends DePIN {
     }
    */
   async twitterTask(account: Flow3Account) {
-    this.logger(`开始推特任务 ${account.address}`)
-    this.requestWithRetry(
+    if (account.twitterTaskFinishedCount === 13) {
+      this.logger(`${account.address} 推特任务已完成；跳过...`)
+      return
+    }
+    this.logger(`${account.address} 开始推特任务...`)
+    await this.requestWithRetry(
       async () => {
         const { headers, httpsAgent } = await this.getHeaders(account)
-        const { statusCode, data } = await this.request.post<{
-          statusCode: number
+        const { data } = await this.request.get<{
           data: {
             taskId: number
             status: number
+            title: string
           }[]
-        }>('/v1/tasks/', {}, { headers, httpsAgent })
-        if (statusCode === 200) {
-          const availableTasks = data.filter((item) => item.status === 0)
-          if (availableTasks.length > 0) {
+        }>('/api/v1/tasks/', { headers, httpsAgent })
+        const availableTasks = data.filter((item) => Number(item.status) !== 1)
+        account.twitterTaskFinishedCount = data.length - availableTasks.length
+        if (availableTasks.length > 0) {
+          for (const task of availableTasks) {
             this.logger(
-              `推特任务 ${availableTasks.map((item) => item.taskId).join('、')} 可完成`
+              `${account.address} 开始完成推特任务 ${task.title} ${task.taskId}`
             )
-            for (const task of availableTasks) {
-              this.logger(`开始完成推特任务 ${task.taskId}`)
-              await this.request.post<{
-                statusCode: number
-              }>(
-                `/v1/tasks/${task.taskId}/complete`,
-                {},
-                { headers, httpsAgent }
-              )
-              this.logger(`推特任务 ${task.taskId} 完成`)
-              await sleep(Math.random() * 3)
-            }
+            await this.request.post(
+              `/api/v1/tasks/${task.taskId}/complete`,
+              {},
+              { headers, httpsAgent }
+            )
+            this.logger(
+              `${account.address} 推特任务 ${task.taskId}: ${task.title} 完成`
+            )
+            account.twitterTaskFinishedCount += 1
+            await sleep(Math.random() * 3)
           }
         }
+        this.updateAccount(account)
       },
       async () => {
         await this.getToken(account)
@@ -130,18 +164,18 @@ export default class Flow3 extends DePIN {
   }
   async dailyTask(account: Flow3Account) {
     const lastDay = moment(account.lastDailyTask).day()
-    const today = moment(new Date(this.now)).day()
+    const today = moment(this.now).day()
     if (
       (!account.lastDailyTask || today - lastDay > 0) &&
       account.hasDailyTask
     ) {
-      this.logger(`开始日常签到 ${account.address}`)
-      this.requestWithRetry(
+      this.logger(`${account.address} 开始日常签到...`)
+      await this.requestWithRetry(
         async () => {
           const { headers, httpsAgent } = await this.getHeaders(account)
           const { data } = await this.request.get<{
             data: { taskId: number; status: number }[]
-          }>('/v1/tasks/daily', {
+          }>('/api/v1/tasks/daily', {
             headers,
             httpsAgent
           })
@@ -150,14 +184,15 @@ export default class Flow3 extends DePIN {
           )
           if (availableDailyTasks.length > 0) {
             this.logger(
-              `日常签到任务 ${availableDailyTasks.map((item) => item.taskId).join('、')} 可完成`
+              `${account.address} 日常签到任务 ${availableDailyTasks.map((item) => item.taskId).join('、')} 可完成`
             )
             await this.request.post<{
               statusCode: number
             }>(`/api/v1/tasks/complete-daily`, {}, { headers, httpsAgent })
-            account.message = '日常签到任务完成'
-            account.lastDailyTask = new Date(this.now)
+            account.message = '日常签到完成'
+            account.lastDailyTask = this.now
             account.hasDailyTask = Boolean(availableDailyTasks.length - 1)
+            this.logger(`${account.address} 日常签到完成`)
           } else {
             account.hasDailyTask = false
           }
@@ -167,24 +202,34 @@ export default class Flow3 extends DePIN {
           await this.getToken(account)
         }
       )
+    } else {
+      this.logger(`${account.address} 日常签到已完成；跳过...`)
     }
   }
   async getPoint(account: Flow3Account) {
-    this.logger(`获取Flow3 ${account.address}的积分`)
-    this.requestWithRetry(
+    this.logger(`${account.address} 获取积分...`)
+    await this.requestWithRetry(
       async () => {
         const { headers, httpsAgent } = await this.getHeaders(account)
         const {
-          data: { totalEarningPoint, todayEarningPoint }
+          data: { totalEarningPoint, todayEarningPoint, referralEarningPoint }
         } = await this.request.get<{
           statusCode: number
-          data: { totalEarningPoint: number; todayEarningPoint: number }
-        }>(`/api/v1/point/info`, { headers, httpsAgent })
+          data: {
+            totalEarningPoint: number
+            todayEarningPoint: number
+            referralEarningPoint: number
+          }
+        }>(`/api/v1/point/info`, {
+          httpsAgent,
+          headers
+        })
         this.logger(
-          `查询Flow3 ${account.address}积分成功==>总积分：${totalEarningPoint};今日积分：${todayEarningPoint}`
+          `${account.address} 查询积分成功==>总积分：${totalEarningPoint};今日积分：${todayEarningPoint}`
         )
         account.todayEarningPoint = todayEarningPoint
         account.totalEarningPoint = totalEarningPoint
+        account.referralEarningPoint = referralEarningPoint
         account.message = '查询积分成功'
         this.updateAccount(account)
       },
@@ -194,44 +239,67 @@ export default class Flow3 extends DePIN {
     )
   }
   async processKeepAlive(account: Flow3Account) {
+    if (!account.token) {
+      await this.getToken(account)
+    }
     await this.shareBandWidth(account)
     await this.getPoint(account)
   }
   async processDaily(account: Flow3Account) {
-    await Promise.all([
-      this.dailyTask(account),
-      this.twitterTask(account),
-      this.getPoint(account)
-    ])
+    if (!account.token) {
+      await this.getToken(account)
+    }
+    await Promise.all([this.dailyTask(account), this.twitterTask(account)])
+    this.getPoint(account)
   }
   async run() {
-    this.preRun()
-    const { inviteCode } = electronStore.get('flow3')
-    if (!inviteCode) {
+    const { referralCode } = electronStore.get('flow3')
+    if (!referralCode) {
       this.stop()
       return this.toast('缺失参数：邀请码')
     }
-    this.cronTasks = [
-      Cron.schedule('0 * * * * *', () => {
-        const { wallets } = electronStore.get('flow3')
-        for (const account of wallets) {
-          if (account.privateKey) {
-            this.queue.add(async () => {
+    this.preRun()
+    const staticProxyList = electronStore.get('staticProxy')
+    const executeDaily = async () => {
+      const { wallets } = electronStore.get('flow3')
+      for (let i = 0; i < wallets.length; i++) {
+        const account = wallets[i]
+        account.proxy ||= staticProxyList[i % staticProxyList.length]?.url
+        if (account.privateKey) {
+          try {
+            await this.processDaily(account)
+          } catch (error: any) {
+            if (error.response?.data?.message?.includes('Already checkin')) {
+              this.logger(`${account.address} 日常签到已完成；跳过...`)
+              account.lastDailyTask = this.now
+            } else {
+              throw error
+            }
+          } finally {
+            this.updateAccount(account)
+          }
+        }
+      }
+    }
+    const executeKeepAlive = async () => {
+      const { wallets } = electronStore.get('flow3')
+      for (let i = 0; i < wallets.length; i++) {
+        const account = wallets[i]
+        account.proxy ||= staticProxyList[i % staticProxyList.length]?.url
+        if (account.privateKey) {
+          await this.queue.add(async () => {
+            try {
               await this.processKeepAlive(account)
-            })
-          }
+            } catch (error: any) {
+              this.logger(`${account.address} 心跳失败，${error.message}`)
+              // throw error
+            }
+          })
         }
-      }),
-      Cron.schedule('0 0 10 * * *', () => {
-        const { wallets } = electronStore.get('flow3')
-        for (const account of wallets) {
-          if (account.privateKey) {
-            this.queue.add(async () => {
-              await this.processDaily(account)
-            })
-          }
-        }
-      })
-    ]
+      }
+    }
+    await executeKeepAlive()
+    await executeDaily()
+    // this.timer = setInterval(() => {}, 1000 * 60 * 5)
   }
 }
