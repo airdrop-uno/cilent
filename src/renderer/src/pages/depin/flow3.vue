@@ -49,7 +49,7 @@
             </n-popconfirm>
           </div>
           <div class="text-sm">
-            共{{ data.length }}个，已签到:{{
+            共{{ data.length }}个，今日已签到:{{
               data.filter((account) => isSingInToday(account)).length
             }}个，完成任务:{{
               data.filter((account) => account.twitterTaskFinishedCount === 13)
@@ -103,7 +103,7 @@ interface RowData {
 
 const isSingInToday = (row: RowData) => {
   return (
-    !row.hasDailyTask ||
+    row.lastDailyTask &&
     moment(row.lastDailyTask).format('YYYY-MM-DD') ===
       moment.utc().format('YYYY-MM-DD')
   )
@@ -189,7 +189,7 @@ const columns: DataTableColumns<RowData> = [
     render: (row) => {
       if (!row.hasDailyTask && row.lastDailyTask) return '全部签到完成'
       return row.lastDailyTask
-        ? moment(row.lastDailyTask).day() === moment().day()
+        ? moment(row.lastDailyTask).day() === moment.utc().day()
           ? `已签到`
           : `未签到`
         : '未签到'

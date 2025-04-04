@@ -31,7 +31,7 @@
 
   - 自动登录
   - 自动刷新Token
-  - 自动定时验证赚钱积分
+  - 自动定时验证赚取积分
 
 - 更多项目持续添加中...
 
@@ -42,7 +42,7 @@
   - Dawn
   - Depined
   - Exeos
-  - Gradient
+  - ~~Gradient~~ # 国人项目，大量封号
   - Haio
   - Humanity
   - Inflective
