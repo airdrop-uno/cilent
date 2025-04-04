@@ -1,5 +1,4 @@
 import { IpcMainEvent } from 'electron'
-import Cron from 'node-cron'
 import { DePIN } from './index'
 import { electronStore } from '../../store'
 import { MonadScoreWallet } from '../../../types/account'
@@ -214,26 +213,29 @@ export default class MonadScore extends DePIN {
       const list = electronStore
         .get('staticProxy')
         .filter((i) => i.status === 1)
-      for (let i = 0; i < wallets.length; i++) {
-        const wallet = wallets[i]
+      const handleWallet = async (wallet: MonadScoreWallet) => {
         if (this.validRunning(wallet)) {
           this.logger(`${wallet.address} 节点已启动！跳过...`)
-          continue
+          return
         }
         if (!wallet.proxy && this.proxyMode === 'Static' && list.length > 0) {
-          wallet.proxy = list[i % list.length].url
+          wallet.proxy = list[wallets.indexOf(wallet) % list.length].url
         }
-        await this.queue.add(async () => {
-          try {
-            await this.startNode(wallet)
-          } catch (error: any) {
-            this.logger(`Error: ${error.message}`)
-            console.error(error)
-            wallet.message = error.message
-            this.updateWallet(wallet)
-          }
+        try {
+          await this.startNode(wallet)
+        } catch (error: any) {
+          this.logger(`Error: ${error.message}`)
+          wallet.message = error.message
+          this.updateWallet(wallet)
+        }
+      }
+      for (const wallet of wallets) {
+        this.queue.add(async () => {
+          await handleWallet(wallet)
         })
       }
+      this.queue.start()
+      await this.queue.onIdle()
     }
 
     execute()

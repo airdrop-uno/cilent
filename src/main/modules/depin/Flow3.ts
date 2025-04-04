@@ -2,15 +2,16 @@ import { IpcMainEvent } from 'electron'
 import bs58 from 'bs58'
 import nacl from 'tweetnacl'
 import { Keypair } from '@solana/web3.js'
-import Cron from 'node-cron'
 import { DePIN } from './index'
 import { electronStore } from '../../store'
 import { Flow3Account } from '../../../types/account'
 import moment from 'moment'
 import { sleep } from '../../utils/common'
 import { getRandomUserAgent } from '../../config/userAgent'
+import PQueue from 'p-queue'
 const message = `Please sign this message to connect your wallet to Flow 3 and verifying your ownership only.`
 export default class Flow3 extends DePIN {
+  protected dailyQueue!: PQueue
   constructor(event: IpcMainEvent) {
     super(event, 'flow3', {
       baseURL: 'https://api.flow3.tech',
@@ -31,6 +32,7 @@ export default class Flow3 extends DePIN {
         Origin: 'https://dashboard.flow3.tech'
       }
     })
+    this.dailyQueue = new PQueue({ concurrency: 4, autoStart: false })
   }
   updateAccount(account: Flow3Account) {
     const { wallets } = electronStore.get('flow3')
@@ -39,6 +41,7 @@ export default class Flow3 extends DePIN {
       wallets[index] = account
     }
     electronStore.set('flow3.wallets', wallets)
+    this.event.reply('updateFlow3Accounts', wallets)
   }
   async getToken(account: Flow3Account) {
     if (!account.userAgent) {
@@ -165,11 +168,11 @@ export default class Flow3 extends DePIN {
   async dailyTask(account: Flow3Account) {
     const lastDay = account.lastDailyTask
       ? moment(account.lastDailyTask).day()
-      : -1
+      : 31
     const today = moment.utc().day()
     if (
-      (!account.lastDailyTask || today - lastDay > 0) &&
-      account.hasDailyTask
+      (account.lastDailyTask === undefined || today - lastDay > 0) &&
+      (typeof account.hasDailyTask === 'boolean' ? account.hasDailyTask : true)
     ) {
       this.logger(`${account.address} 开始日常签到...`)
       await this.requestWithRetry(
@@ -254,7 +257,12 @@ export default class Flow3 extends DePIN {
       await this.getToken(account)
     }
     await Promise.all([this.dailyTask(account), this.twitterTask(account)])
-    this.getPoint(account)
+    return this.getPoint(account)
+  }
+  async stop() {
+    super.stop()
+    this.dailyQueue.pause()
+    this.dailyQueue.clear()
   }
   async run() {
     const { referralCode } = electronStore.get('flow3')
@@ -263,27 +271,30 @@ export default class Flow3 extends DePIN {
       return this.toast('缺失参数：邀请码')
     }
     this.preRun()
+    this.dailyQueue.pause()
+    this.dailyQueue.clear()
+
     const staticProxyList = electronStore.get('staticProxy')
     const executeDaily = async () => {
       const { wallets } = electronStore.get('flow3')
-      for (let i = 0; i < wallets.length; i++) {
-        const account = wallets[i]
-        account.proxy ||= staticProxyList[i % staticProxyList.length]?.url
-        if (account.privateKey) {
+      for (const wallet of wallets) {
+        this.dailyQueue.add(async () => {
           try {
-            await this.processDaily(account)
+            return await this.processDaily(wallet)
           } catch (error: any) {
             if (error.response?.data?.message?.includes('Already checkin')) {
-              this.logger(`${account.address} 日常签到已完成；跳过...`)
-              account.lastDailyTask = this.now
+              this.logger(`${wallet.address} 日常签到已完成；跳过...`)
+              wallet.lastDailyTask = this.now
             } else {
               throw error
             }
           } finally {
-            this.updateAccount(account)
+            this.updateAccount(wallet)
           }
-        }
+        })
       }
+      this.dailyQueue.start()
+      await this.dailyQueue.onIdle()
     }
     const executeKeepAlive = async () => {
       const { wallets } = electronStore.get('flow3')
@@ -291,9 +302,9 @@ export default class Flow3 extends DePIN {
         const account = wallets[i]
         account.proxy ||= staticProxyList[i % staticProxyList.length]?.url
         if (account.privateKey) {
-          await this.queue.add(async () => {
+          this.queue.add(async () => {
             try {
-              await this.processKeepAlive(account)
+              return await this.processKeepAlive(account)
             } catch (error: any) {
               this.logger(`${account.address} 心跳失败，${error.message}`)
               // throw error
@@ -301,9 +312,10 @@ export default class Flow3 extends DePIN {
           })
         }
       }
+      this.dailyQueue.start()
+      await this.queue.onIdle()
     }
-    await executeKeepAlive()
-    await executeDaily()
-    // this.timer = setInterval(() => {}, 1000 * 60 * 5)
+    executeKeepAlive()
+    executeDaily()
   }
 }

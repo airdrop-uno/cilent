@@ -60,7 +60,6 @@ export const MonadScoreActions: Record<
       proxyMode = 'Static',
       proxyApiUrl
     } = options
-    monadScore ||= new MonadScore(event)
     if (!referralCode) {
       event.reply('toastMessage', {
         status: 'error',
@@ -71,6 +70,7 @@ export const MonadScoreActions: Record<
     electronStore.set('monadScore.concurrency', concurrency)
     electronStore.set('monadScore.proxyMode', proxyMode)
     electronStore.set('monadScore.referralCode', referralCode)
+    monadScore ||= new MonadScore(event)
     monadScore.setConcurrency(concurrency)
     monadScore.setProxyMode(proxyMode)
     monadScore.setProxyDynamicUrl(proxyApiUrl)

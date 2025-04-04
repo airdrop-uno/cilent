@@ -52,7 +52,8 @@ export class DePIN {
       concurrency = os.cpus().length
     } = options
     this.queue = new PQueue({
-      concurrency
+      concurrency,
+      autoStart: false
     })
     this.intervalSeconds = intervalSeconds || 30 * 1000
     this.name = name
@@ -78,6 +79,7 @@ export class DePIN {
   stop() {
     this.queue.pause()
     this.queue.clear()
+
     this.isRunning = false
     if (this.timer) {
       clearInterval(this.timer)
@@ -105,7 +107,6 @@ export class DePIN {
       throw new Error(message)
     }
     this.stop()
-    this.queue.start()
     this.cronTask?.start()
     this.isRunning = true
     this.event.reply('toastMessage', {
