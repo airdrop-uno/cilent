@@ -330,9 +330,10 @@ export class DePIN {
     retry: () => Promise<void>
   ): Promise<T> {
     try {
-      return await callback()
+      const res = await callback()
+      return res
     } catch (error: any) {
-      this.logger(`请求失败:${error.message}`)
+      this.logger(`请求失败:${error.response.data?.message || error.message}`)
       if (
         error.response &&
         (error.response.status === 401 ||

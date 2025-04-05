@@ -9,7 +9,7 @@
         :width="200"
         :collapsed="collapsed"
         show-trigger
-        class="overflow-y-hidden"
+        class="overflow-hidden"
         style="height: 100vh"
         @collapse="collapsed = true"
         @expand="collapsed = false"

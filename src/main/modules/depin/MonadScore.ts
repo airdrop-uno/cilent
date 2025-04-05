@@ -4,7 +4,6 @@ import { electronStore } from '../../store'
 import { MonadScoreWallet } from '../../../types/account'
 import moment from 'moment'
 import { sleep } from '../../utils/common'
-
 const tasks = [
   {
     title: 'Follow MonadScore on X',
@@ -63,7 +62,7 @@ export default class MonadScore extends DePIN {
       await this.refreshToken(wallet)
     }
     this.logger(`${wallet.address} 节点启动中...`)
-    this.requestWithRetry(
+    await this.requestWithRetry(
       async () => {
         const { headers, httpsAgent } = await this.getHeaders(wallet)
         wallet.message = '节点启动中...'
@@ -137,8 +136,8 @@ export default class MonadScore extends DePIN {
   async getLoginToken(wallet: MonadScoreWallet) {
     const { referralCode } = electronStore.get('monadScore')
     const { headers, httpsAgent } = await this.getHeaders(wallet)
-    const { success, token } = await this.request.post<{
-      success: boolean
+    this.logger(`${wallet.address} 刷新登录Token...`)
+    const { token } = await this.request.post<{
       token: string
     }>(
       '/user',
@@ -146,17 +145,13 @@ export default class MonadScore extends DePIN {
       {
         headers,
         httpsAgent
-      }
+      },
+      1
     )
-    if (success) {
-      wallet.loginToken = token
-      wallet.message = '获取登录Token成功'
-      this.logger(`${wallet.address} 获取登录Token成功`)
-      return token
-    }
-    wallet.message = '获取登录Token失败'
-    this.logger(`${wallet.address} 获取登录Token失败`)
-    throw new Error(`${wallet.address} 获取登录Token失败`)
+    wallet.loginToken = token
+    wallet.message = '获取登录Token成功'
+    this.updateWallet(wallet)
+    this.logger(`${wallet.address} 获取登录Token成功`)
   }
   async refreshToken(wallet: MonadScoreWallet) {
     const { headers, httpsAgent } = await this.getHeaders(wallet)
@@ -166,8 +161,7 @@ export default class MonadScore extends DePIN {
     this.logger(`${wallet.address} 刷新Token...`)
     await this.requestWithRetry(
       async () => {
-        const { success, token, user } = await this.request.post<{
-          success: boolean
+        const { token, user } = await this.request.post<{
           token: string
           user: {
             claimedTasks: string[]
@@ -185,19 +179,17 @@ export default class MonadScore extends DePIN {
               Authorization: `Bearer ${wallet.loginToken}`
             },
             httpsAgent
-          }
+          },
+          1
         )
-        if (success) {
-          wallet.token = token
-          wallet.referralCode = user.referralCode
-          wallet.points = user.totalPoints
-          wallet.claimedTasks = user.claimedTasks
-          wallet.registered = true
-          wallet.message = '刷新Token成功'
-          this.updateWallet(wallet)
-          this.logger(`${wallet.address} 刷新Token成功`)
-          return
-        }
+        wallet.token = token
+        wallet.referralCode = user.referralCode
+        wallet.points = user.totalPoints
+        wallet.claimedTasks = user.claimedTasks
+        wallet.registered = true
+        wallet.message = '刷新Token成功'
+        this.updateWallet(wallet)
+        this.logger(`${wallet.address} 刷新Token成功`)
       },
       async () => {
         this.getLoginToken(wallet)
@@ -206,14 +198,19 @@ export default class MonadScore extends DePIN {
   }
   async run() {
     this.preRun()
-    const execute = async () => {
-      const { referralCode, wallets } = electronStore.get('monadScore')
-      if (!referralCode) return this.logger('Empty ReferralCode')
-      if (wallets.length === 0) return this.logger('Empty Wallets')
-      const list = electronStore
-        .get('staticProxy')
-        .filter((i) => i.status === 1)
-      const handleWallet = async (wallet: MonadScoreWallet) => {
+    const { referralCode, wallets } = electronStore.get('monadScore')
+    if (!referralCode) return this.logger('Empty ReferralCode')
+    if (wallets.length === 0) return this.logger('Empty Wallets')
+    const list = electronStore
+      .get('staticProxy')
+      .filter(Boolean)
+      .filter((i) => i.status === 1)
+    let i = 0
+    for (const wallet of wallets) {
+      if (!this.isRunning) {
+        return this.logger('队列任务已停止')
+      }
+      this.queue.add(async () => {
         if (this.validRunning(wallet)) {
           this.logger(`${wallet.address} 节点已启动！跳过...`)
           return
@@ -222,22 +219,16 @@ export default class MonadScore extends DePIN {
           wallet.proxy = list[wallets.indexOf(wallet) % list.length].url
         }
         try {
+          this.logger(`开始执行第${++i}个节点...`)
           await this.startNode(wallet)
         } catch (error: any) {
           this.logger(`Error: ${error.message}`)
           wallet.message = error.message
           this.updateWallet(wallet)
         }
-      }
-      for (const wallet of wallets) {
-        this.queue.add(async () => {
-          await handleWallet(wallet)
-        })
-      }
-      this.queue.start()
-      await this.queue.onIdle()
+      })
     }
-
-    execute()
+    this.queue.start()
+    await this.queue.onIdle()
   }
 }

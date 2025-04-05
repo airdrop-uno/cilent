@@ -246,7 +246,9 @@ onMounted(() => {
     'monadScoreLog',
     (_event, log: { type: string; message: string }) => {
       logs.value.push(`[${new Date().toLocaleString()}] ${log.message}`)
-      logs.value = logs.value.slice(-40)
+      if (logs.value.length > 300) {
+        logs.value = logs.value.slice(-300)
+      }
     }
   )
 })
